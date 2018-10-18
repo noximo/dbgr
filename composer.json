@@ -1,0 +1,33 @@
+{
+  "name": "noximo/dbgr",
+  "description": "Versatile alternative for var_dump",
+  "keywords": [
+    "var_dump",
+    "dump",
+    "debug"
+  ],
+  "type": "library",
+  "authors": [
+    {
+      "name": "Tomas Pospisil",
+      "email": "pospisilt@gmail.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "noximo\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">= 7.2",
+    "tracy/tracy": "^2.5",
+    "ext-json": "*",
+    "nette/utils": "^2.5",
+    "nette/neon": "^2.4"
+  },
+  "license": "MIT",
+  "require-dev": {
+    "phpstan/phpstan": "^0.10.3",
+    "friendsofphp/php-cs-fixer": "3.0.x-dev"
+  }
+}

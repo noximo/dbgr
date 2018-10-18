@@ -1,0 +1,147 @@
+.debug-inline {
+    color: black;
+    text-align: left;
+    font-family: monospace, monospace;
+    font-size: 12px;
+    border: 1px solid lightgray;
+    border-bottom: rgb(255, 100, 100) 3px solid;
+    background-color: lightyellow;
+    width: 100%;
+    min-width: 500px;
+    z-index: 9999;
+    position: relative;
+
+}
+
+.debug-todo {
+    border-bottom: rgb(255, 100, 100) 1px solid;
+    padding-top: 5px;
+}
+
+.debug-inline:hover {
+    position: relative;
+    z-index: 9999;
+}
+
+.debug-inline-name {
+    font-weight: bold;
+    font-size: 13px;
+    color: black;
+    display: block;
+}
+
+.debug-hide {
+    float: right;
+    margin: 0 5px;
+    text-decoration: none;
+    color: red;
+    font-size: 13px;
+}
+
+.debug-backtrace, .debug-backtrace-first {
+    color: black;
+    margin-left: 5px;
+}
+
+.debug-backtrace a, .debug-backtrace-first a {
+    color: black;
+}
+
+.debug-backtrace a:hover, .debug-backtrace-first a:hover {
+    color: darkblue;
+}
+
+.debug-backtrace-first {
+    border-bottom: 1px dotted #ba0000;
+    cursor: help;
+}
+
+.debug-backtrace-as-variable {
+    background-color: white;
+}
+
+.debug-backtraces {
+    display: none;
+    padding-left: 10px;
+    background-color: lightblue;
+    cursor: help;
+}
+
+.debug-variable {
+    border: lightgrey 1px dashed;
+    max-height: 100px;
+    overflow: auto;
+    margin: 0 0 5px 5px;
+}
+
+.debug-variable-name {
+    font-size: 12px;
+    margin: 5px 0 0 5px;
+    display: block;
+}
+
+.debug-sql {
+    position: relative;
+}
+
+.debug-sql-link {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+
+/* toggle */
+.tracy-collapsed {
+
+}
+
+.tracy-toggle.tracy-collapsed {
+    display: inline;
+}
+
+/* dump */
+pre.tracy-dump {
+    text-align: left;
+    color: #444;
+    font-size: 12px !important;
+    margin: 0;
+}
+
+pre.tracy-dump div {
+    padding-left: 3ex;
+    max-width: 600px;
+}
+
+pre.tracy-dump div div {
+    border-left: 1px solid rgba(0, 0, 0, .1);
+    margin-left: .5ex;
+}
+
+.tracy-dump-array, .tracy-dump-object {
+    color: #C22;
+}
+
+.tracy-dump-string {
+    color: #35D;
+}
+
+.tracy-dump-number {
+    color: #090;
+}
+
+.tracy-dump-null, .tracy-dump-bool {
+    color: #850;
+}
+
+.tracy-dump-visibility, .tracy-dump-hash {
+    font-size: 85%;
+    color: #999;
+}
+
+.tracy-dump-indent {
+    display: none;
+}
+
+span[data-tracy-href] {
+    border-bottom: 1px dotted rgba(0, 0, 0, .2);
+}
