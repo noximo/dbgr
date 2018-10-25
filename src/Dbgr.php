@@ -68,7 +68,7 @@ class Dbgr
      *
      * @return Dbgr
      */
-    public static function loadConfig($file = null): Dbgr
+    public static function loadConfig($file = null): void
     {
         $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'default.neon');
         $config = Neon::decode($defaultFile);
@@ -86,16 +86,14 @@ class Dbgr
         $config = array_replace($config, $customConfig);
 
         self::$logDir = $config['logDir'] . DIRECTORY_SEPARATOR;
-        self::$allowedIPAddresses = $config['allowedIPAddresses'];
-        self:: $adminerUrlLink = $config['adminerUrlLink'];
-        self::$adminerDatabaseName = $config['adminerDatabaseName'];
+        self::$allowedIPAddresses = $config['allowedIPAddresses'] ?? null;
+        self:: $adminerUrlLink = $config['adminerUrlLink'] ?? null;
+        self::$adminerDatabaseName = $config['adminerDatabaseName'] ?? null;
 
-        if ($config['editorUri'] !== null && $config['editorUri'] !== '' && $config['editorUri'] !== Debugger::$editor) {
+        if (isset($config['editorUri']) && $config['editorUri'] !== null && $config['editorUri'] !== '' && $config['editorUri'] !== Debugger::$editor) {
             /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
             Debugger::$editor = $config['editorUri'];
         }
-
-        return self::getInstance();
     }
 
     /**
@@ -223,7 +221,7 @@ class Dbgr
         $file = file($backtrace[0]['file']);
         $line = trim((string) $file[$backtrace[0]['line'] - 1]);
 
-        $start = strpos($line, 'debug(') + 6;
+        $start = strpos($line, 'dump(') + 5;
 
         $stop = strpos($line, ');', $start);
 
@@ -614,7 +612,15 @@ class Dbgr
             $options[Dumper::TRUNCATE] = false;
         }
 
-        return Dumper::dump($variable, $options);
+        if (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
+            return Dumper::toHtml($variable, $options);
+        } elseif (self::detectColors()) {
+            return Dumper::toTerminal($variable, $options);
+        } else {
+            return Dumper::toText($variable, $options);
+        }
+
+        return $variable;
     }
 
     /**
@@ -660,9 +666,9 @@ class Dbgr
                 self::printStyles();
             }
             if (self::$isAjax) {
-                self::echo(self::ajaxOutput() . '===========================' . PHP_EOL);
+                self::echo(self::ajaxOutput() . '===========================' . PHP_EOL, false, false, true);
             } else {
-                self::echo(self::$output);
+                self::echo(self::$output, false);
             }
         } elseif (!empty(self::$file) && !empty(self::$logDir)) {
             if (!isset(self::$fileOutputs[self::$file])) {
@@ -720,8 +726,7 @@ class Dbgr
             $message = date('Y-m-d H:i:s') . ' - ' . $message;
         }
         if (PHP_SAPI !== 'cli') {
-            echo strip_tags(nl2br($message));
-            echo '<br>';
+            echo $message;
         } elseif ($stripTags) {
             echo strip_tags($message);
         } else {
