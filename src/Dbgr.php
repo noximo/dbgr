@@ -4,13 +4,12 @@ declare(strict_types = 1);
 namespace noximo;
 
 use Countable;
-use Error;
-use Exception;
 use Nette\IOException;
 use Nette\Neon\Neon;
 use Nette\Utils\DateTime;
 use Nette\Utils\FileSystem;
 use RuntimeException;
+use Throwable;
 use Tracy\Debugger;
 use Tracy\Dumper;
 use Tracy\Helpers;
@@ -42,7 +41,6 @@ class Dbgr
     private static $counter = [];
     private static $counterTotal = [];
     private static $dumperOptions = [];
-
     private static $output = '';
     private static $allOutputs = [];
     private static $firstTimer;
@@ -66,7 +64,7 @@ class Dbgr
     /**
      * @param string|null $file
      *
-     * @return Dbgr
+     * @return void
      */
     public static function loadConfig($file = null): void
     {
@@ -97,18 +95,6 @@ class Dbgr
     }
 
     /**
-     * @return Dbgr
-     */
-    public static function getInstance(): Dbgr
-    {
-        if (self::$instance === null) {
-            self::$instance = new Dbgr();
-        }
-
-        return self::$instance;
-    }
-
-    /**
      * Set name for debug
      *
      * @param string $name
@@ -120,6 +106,18 @@ class Dbgr
         self::$name = $name;
 
         return self::getInstance();
+    }
+
+    /**
+     * @return Dbgr
+     */
+    public static function getInstance(): Dbgr
+    {
+        if (self::$instance === null) {
+            self::$instance = new Dbgr();
+        }
+
+        return self::$instance;
     }
 
     /**
@@ -489,8 +487,8 @@ class Dbgr
                 self::addToOutput(self::highlight($variable));
                 self::addToOutput(self::sqlLink($variable));
                 self::addToOutput('</div>');
-            } elseif ($variable instanceof Exception || $variable instanceof Error) {
-                /** @var Exception $variable */
+            } elseif ($variable instanceof Throwable) {
+                /** @var Throwable $variable */
                 self::addToOutput(self::useDumper($variable), null);
                 self::_printBacktraces($variable->getTrace());
             } elseif (self::isBacktrace($variable)) {
@@ -613,14 +611,26 @@ class Dbgr
         }
 
         if (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
-            return Dumper::toHtml($variable, $options);
+            $string = Dumper::toHtml($variable, $options);
         } elseif (self::detectColors()) {
-            return Dumper::toTerminal($variable, $options);
+            $string = Dumper::toTerminal($variable, $options);
         } else {
-            return Dumper::toText($variable, $options);
+            $string = Dumper::toText($variable, $options);
         }
 
-        return $variable;
+        return $string;
+    }
+
+    /**
+     * @return bool
+     */
+    private static function detectColors(): bool
+    {
+        return Dumper::$terminalColors &&
+            (getenv('ConEmuANSI') === 'ON'
+                || getenv('ANSICON') !== false
+                || getenv('term') === 'xterm-256color'
+                || (\defined('STDOUT') && \function_exists('posix_isatty') && posix_isatty(STDOUT)));
     }
 
     /**
@@ -648,9 +658,6 @@ class Dbgr
         return isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']);
     }
 
-    /**
-     *
-     */
     private static function debugEnd(): void
     {
         self::defaultOptions(true);
@@ -797,11 +804,11 @@ class Dbgr
     /**
      * Dump any number of variables
      *
-     * @param array ...$variables
+     * @param mixed ...$variables
      *
      * @return Dbgr
      */
-    public static function dump(array ...$variables): Dbgr
+    public static function dump(...$variables): Dbgr
     {
         self::defaultOptions();
         $backtrace = debug_backtrace();
@@ -839,14 +846,14 @@ class Dbgr
     }
 
     /**
-     * Vypíše obsah proměnných, pokud je splněna podmínka jejíž název je předán jako první argument
+     * Dump only if previously set condition is true. Use method condition to set up condition
      *
      * @param string $conditionName
-     * @param array ...$args
+     * @param mixed ...$args
      *
      * @return Dbgr
      */
-    public static function debugConditional(string $conditionName, array ...$args): Dbgr
+    public static function dumpConditional(string $conditionName, ...$args): Dbgr
     {
         if (isset(self::$condition[$conditionName]) && self::$condition[$conditionName]) {
             self::defaultOptions();
@@ -860,7 +867,41 @@ class Dbgr
     }
 
     /**
-     * Nastaví podmínku pro kondiční debug (debug se zobrazí jen při splněné podmínce
+     * Dumps only if first parameter is true. Use condition() and dumpConditional() for better versatility
+     *
+     * @param bool $condition
+     * @param mixed ...$args
+     *
+     * @return Dbgr
+     */
+    public static function dumpOnTrue(bool $condition, ...$args): Dbgr
+    {
+        if ($condition === true) {
+            self::defaultOptions();
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $params = self::getParams($backtrace);
+
+            self::debugProccess($args, $backtrace, $params);
+        }
+
+        return self::getInstance();
+    }
+
+    /**
+     * alias of condition
+     *
+     * @param string $conditionName
+     * @param bool $value
+     *
+     * @return Dbgr
+     */
+    public static function setCondition(string $conditionName, bool $value): Dbgr
+    {
+        return self::condition($conditionName, $value);
+    }
+
+    /**
+     * Set condition to control dumpConditional calls
      *
      * @param string $conditionName
      * @param bool $value
