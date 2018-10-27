@@ -1,0 +1,27 @@
+{
+  "logDir": "../../log/",
+  "adminerDatabaseName": null,
+  "adminerUrlLink": "http://localhost/adminer.php",
+  "allowedIPAddresses": [],
+  "editorUri": "editor://%action/?file=%file&line=%line&search=%search&replace=%replace",
+  "didYouKnow": [
+    "You can use *dumpOnTrue* method to print variables only when first parameter is true.",
+    "Dbgr respects *__debugInfo* magic method. You can use it to adjust what data object prints out.",
+    "You can use method *condition* to set wheter condition is true or false and then use dumpConditional only when condition is true.",
+    "You can set your own config file by creating dbgr.json in root folder or using *loadConfig* method dynamicaly",
+    "Dbgr can open files on line where Dbgr was called, backtrace locations and even class declarations with single click. To set it up, follow guide at https://tracy.nette.org/en/open-files-in-ide",
+    "Colored lines at the left side are based on backtraces. Same dump, reached through different stack traces will have different colors to quickly tell them apart",
+    "You name your dumped data using <b>setName</b> method",
+    "Dbgr will output time passed since the last time Dbgr was called.",
+    "You can save dump into file by calling <b>setFile</b> before calling method dump. Multiple calls with the same filename will be appended into single file.",
+    "Dbgr will output data only on localhost. You can whitelist ip addresses that can view dumped data (set allowedIPAddresses in your config) or call <b>forceDevelopmentMode</b> method",
+    "<b>Dbgr::echo</b> provides improved echo function with immediate output, timestamping",
+    "If you're working with large arrays, you can use <b>setDepth</b> method to increase depth of printed subarrays",
+    "If you're dumping sql queries, Dbgr will highlight their syntax and can provide link into adminer - no need to copy them. Use adminerDatabaseName and adminerUrlLink configurations to set it up.",
+    "Dbgr respects environmet in which it was run, wheter it is HTML page, AJAX request or CLI application. You can force output to be in HTML format using <b>forceHTML</b>",
+    "If you're annoyed by hidden and forgotten exits and dies, you can use <b>dieNow</b> method to end script with proper and verbose message",
+    "You can use <b>dieAfter</b> method if you want to end script execution prematurely but not immediatly. No need to iterate over 20 000 items if 20 is enough.",
+    "If you have too many dumps in your output, you can differentiate them by colors using <b>setColor</b> method",
+    "If you're working with imports or other large sets of data, you can use methods <b>setCounter</b> and <b>incrementCounter</b> to quickly view progress. It will print only every Xth iteration."
+  ]
+}

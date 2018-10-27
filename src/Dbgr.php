@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace noximo;
 
 use Countable;
-use Nette\Neon\Neon;
+use Nette\FileNotFoundException;
 use Nette\Utils\DateTime;
 use Nette\Utils\FileSystem;
 use RuntimeException;
@@ -110,6 +110,8 @@ class Dbgr
     /** @var string[] */
     private static $localIPAddresses = ['127.0.0.1', '0.0.0.0', 'localhost', '::1'];
 
+    /** @var bool */
+    private static $forceDevelopmentMode = false;
     /** @var string[] */
     private static $allowedIPAddresses = [];
 
@@ -118,56 +120,50 @@ class Dbgr
 
     /** @var string */
     private static $adminerDatabaseName;
+    private static $config;
 
     public function __construct()
     {
-        self::loadConfig();
+        self::loadDefaultConfig();
     }
 
     /**
      * @param string|null $file
      */
-    public static function loadConfig(?string $file = null): void
+    public static function loadDefaultConfig(): void
     {
-        $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'default.neon');
-        $config = Neon::decode($defaultFile);
+        $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR);
+        self::$config = json_decode($defaultFile);
 
-        $localFile = \dirname(__FILE__, 3) . DIRECTORY_SEPARATOR . 'dbgr_config.neon';
+        $localFile = \dirname(__FILE__, 3) . DIRECTORY_SEPARATOR . 'dbgr.json';
         $customConfig = [];
-        if ($file && file_exists($file)) {
-            $content = FileSystem::read($file);
-            $customConfig = Neon::decode($content);
-        } elseif (file_exists($localFile)) {
+        if (file_exists($localFile)) {
             $content = FileSystem::read($localFile);
-            $customConfig = Neon::decode($content);
+            $customConfig = json_decode($content);
         }
 
-        $config = array_merge_recursive($config, $customConfig);
-
-        self::$logDir = $config['logDir'] . DIRECTORY_SEPARATOR;
-        self::$allowedIPAddresses = $config['allowedIPAddresses'] ?? null;
-        self::$adminerUrlLink = $config['adminerUrlLink'] ?? null;
-        self::$adminerDatabaseName = $config['adminerDatabaseName'] ?? null;
-
-        if (isset($config['editorUri']) &&
-            $config['editorUri'] !== null &&
-            $config['editorUri'] !== '' &&
-            $config['editorUri'] !== Debugger::$editor) {
-            /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
-            Debugger::$editor = $config['editorUri'];
-        }
+        self::setConfig($customConfig);
     }
 
     /**
-     * Set name for debug
-     *
-     * @param string $name
-     *
-     * @return Dbgr
+     * @param array $customConfig
      */
-    public static function setName(string $name): self
+    public static function setConfig(array $customConfig): self
     {
-        self::$name = $name;
+        self::$config = array_merge_recursive(self::$config, $customConfig);
+
+        self::$logDir = self::$config['logDir'] . DIRECTORY_SEPARATOR;
+        self::$allowedIPAddresses = self::$config['allowedIPAddresses'] ?? null;
+        self::$adminerUrlLink = self::$config['adminerUrlLink'] ?? null;
+        self::$adminerDatabaseName = self::$config['adminerDatabaseName'] ?? null;
+
+        if (isset(self::$config['editorUri']) &&
+            self::$config['editorUri'] !== null &&
+            self::$config['editorUri'] !== '' &&
+            self::$config['editorUri'] !== Debugger::$editor) {
+            /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
+            Debugger::$editor = self::$config['editorUri'];
+        }
 
         return self::getInstance();
     }
@@ -185,10 +181,45 @@ class Dbgr
     }
 
     /**
-     * Nastaví do jaké hloubky se mají vypsat proměnné
-     * @param int $depth
+     * @param $file
+     *
      * @return Dbgr
-*/
+     */
+    public static function loadConfig($file): Dbgr
+    {
+        if (file_exists($file)) {
+            $content = FileSystem::read($file);
+            $customConfig = json_decode($content);
+
+            self::setConfig($customConfig);
+
+            return self::getInstance();
+        }
+
+        throw new FileNotFoundException('Configuration file ' . $file . ' not found');
+    }
+
+    /**
+     * Set name for debug
+     *
+     * @param string $name
+     *
+     * @return Dbgr
+     */
+    public static function setName(string $name): self
+    {
+        self::$name = $name;
+
+        return self::getInstance();
+    }
+
+    /**
+     * Nastaví do jaké hloubky se mají vypsat proměnné
+     *
+     * @param int $depth
+     *
+     * @return Dbgr
+     */
     public static function setDepth(int $depth): self
     {
         self::defaultOptions();
@@ -199,8 +230,9 @@ class Dbgr
 
     /**
      * Nastaví výchozí nastavení
+     *
      * @param bool $reset
-*/
+     */
     public static function defaultOptions(bool $reset = false): void
     {
         if ($reset || empty(self::$dumperOptions)) {
@@ -212,16 +244,24 @@ class Dbgr
                 Dumper::DEBUGINFO => true,
                 Dumper::LOCATION => Dumper::LOCATION_CLASS,
             ];
+            self::$forceDevelopmentMode = false;
         }
     }
 
     /**
-     * Nastaví zápis debugu do souboru
+     * Output dump into file. Multiple calls with same filename will be merged into one file.
+     *
      * @param string $filename
+     *
      * @return Dbgr
-*/
-    public static function setFile(string $filename): self
+     */
+    public static function setFile(string $filename = null): self
     {
+        if ($filename === null) {
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $params = self::getParams($backtrace);
+            $filename = self::getHash([], $backtrace, $params);
+        }
         $filename = str_replace('.html', '', $filename) . '.html';
         self::$file = $filename;
         self::forceHtml();
@@ -230,7 +270,38 @@ class Dbgr
     }
 
     /**
-     * Nastaví jestli vypsat proměnnou jako HTML kód.
+     * @param array $backtrace
+     *
+     * @return string[]
+     */
+    private static function getParams(array $backtrace): array
+    {
+        $file = file($backtrace[0]['file']);
+        $line = trim((string) $file[$backtrace[0]['line'] - 1]);
+
+        $start = strpos($line, 'dump(') + 5;
+
+        $stop = strpos($line, ');', $start);
+
+        $params = substr($line, $start, $stop - $start);
+
+        return explode(',', $params);
+    }
+
+    /**
+     * @param string[] $args
+     * @param string[] $backtrace
+     * @param string[] $params
+     *
+     * @return string
+     */
+    private static function getHash(array $args, array $backtrace, array $params): string
+    {
+        return md5(base64_encode((string) json_encode([$args, $backtrace, $params])));
+    }
+
+    /**
+     * Should dumped data always print out formatted as HTML?
      *
      * @param bool $set Vypsat?
      *
@@ -244,46 +315,44 @@ class Dbgr
     }
 
     /**
-     * Ukončí skript a vypíše o tom zprávu
+     * End script execution instantly and loudly.
+     *
+     * @param bool $force
      */
-    public static function dieNow(): void
+    public static function dieNow(bool $force = false): void
     {
-        self::setColor('red');
-        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-        $params = self::getParams($backtrace);
-        self::debugProccess(['SCRIPT FORCEFULLY ENDED'], $backtrace, $params);
+        if ($force || self::canBeOutputed()) {
+            self::setColor('red');
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $params = self::getParams($backtrace);
+            self::debugProccess(['SCRIPT FORCEFULLY ENDED'], $backtrace, $params);
 
-        die();
+            die();
+        }
+    }
+
+    /**
+     * @return bool
+     */
+    public static function canBeOutputed(): bool
+    {
+        $addresses = array_merge(self::$localIPAddresses, self::$allowedIPAddresses);
+
+        return self::$forceDevelopmentMode || Debugger::detectDebugMode($addresses);
     }
 
     /**
      * Nastaví barvu výpisu
+     *
      * @param string $color
+     *
      * @return Dbgr
-*/
+     */
     public static function setColor(string $color): self
     {
         self::$color = $color;
 
         return self::getInstance();
-    }
-
-    /**
-     * @param array $backtrace
-     * @return string[]
-*/
-    private static function getParams(array $backtrace): array
-    {
-        $file = file($backtrace[0]['file']);
-        $line = trim((string) $file[$backtrace[0]['line'] - 1]);
-
-        $start = strpos($line, 'dump(') + 5;
-
-        $stop = strpos($line, ');', $start);
-
-        $params = substr($line, $start, $stop - $start);
-
-        return explode(',', $params);
     }
 
     /**
@@ -352,22 +421,10 @@ class Dbgr
     /**
      * @param string $output
      * @param string|null $endofline
-*/
+     */
     private static function addToOutput(string $output, ?string $endofline = PHP_EOL): void
     {
         self::$output .= $output . $endofline;
-    }
-
-    /**
-     * @param string[] $args
-     * @param string[] $backtrace
-     * @param string[] $params
-     *
-     * @return string
-     */
-    protected static function getHash(array $args, array $backtrace, array $params): string
-    {
-        return md5(base64_encode((string) json_encode([$args, $backtrace, $params])));
     }
 
     /**
@@ -416,7 +473,7 @@ class Dbgr
     /**
      * @param array $backtrace
      * @param bool|null $first
-*/
+     */
     private static function printHeader(array $backtrace, ?bool $first = null): void
     {
         $first = $first ?? null;
@@ -472,7 +529,7 @@ class Dbgr
      *
      * @return string
      */
-    public static function getOpenInIDEBacktrace(array $backtrace): string
+    private static function getOpenInIDEBacktrace(array $backtrace): string
     {
         $link = self::getOpenInIDELink($backtrace['file'], (int) $backtrace['line']);
         $line = "<a title='Otevřít v editoru' href='" . $link . "'><small>" . \dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
@@ -492,7 +549,7 @@ class Dbgr
      *
      * @return string
      */
-    public static function getOpenInIDELink(string $file, int $line): string
+    private static function getOpenInIDELink(string $file, int $line): string
     {
         return Helpers::editorUri($file, $line) ?? '#';
     }
@@ -653,16 +710,6 @@ class Dbgr
     }
 
     /**
-     * @return bool
-     */
-    public static function canBeOutputed(): bool
-    {
-        $addresses = array_merge(self::$localIPAddresses, self::$allowedIPAddresses);
-
-        return Debugger::detectDebugMode($addresses);
-    }
-
-    /**
      * @param mixed $variable
      *
      * @return mixed
@@ -784,11 +831,11 @@ class Dbgr
      *
      * @param string $message
      * @param bool $bold Should message be bolder?
-     *
      * @param bool $showTime
      * @param bool $stripTags
+     *
      * @return Dbgr
-*/
+     */
     public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
     {
         if ($bold) {
@@ -847,25 +894,28 @@ class Dbgr
      * Stop script execution after $count calls. Can output variable
      *
      * @param int $count
+     * @param bool $force
      * @param mixed $variable
      *
      * @return Dbgr
-*/
-    public static function dieAfter(int $count, $variable = 'not_set'): self
+     */
+    public static function dieAfter(int $count, bool $force = false, $variable = 'not_set'): self
     {
-        if (self::$dieAfter === null) {
-            self::$dieAfter = $count - 1;
-        } else {
-            self::$dieAfter--;
-            if (self::$dieAfter === 0) {
-                if ($variable !== 'not_set') {
-                    self::dump($variable);
-                }
-                self::setColor('red');
-                $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-                self::debugProccess(['END' => 'SCRIPT FORCEFULLY STOPPED AFTER' . $count . ' CALLS'], $backtrace, ['END' => 'END']);
+        if ($force || self::canBeOutputed()) {
+            if (self::$dieAfter === null) {
+                self::$dieAfter = $count - 1;
+            } else {
+                self::$dieAfter--;
+                if (self::$dieAfter === 0) {
+                    if ($variable !== 'not_set') {
+                        self::dump($variable);
+                    }
+                    self::setColor('red');
+                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+                    self::debugProccess(['END' => 'SCRIPT FORCEFULLY STOPPED AFTER' . $count . ' CALLS'], $backtrace, ['END' => 'END']);
 
-                die();
+                    die();
+                }
             }
         }
 
@@ -892,8 +942,9 @@ class Dbgr
 
     /**
      * @param bool $set
+     *
      * @return Dbgr
-*/
+     */
     public static function noAjax(bool $set = true): self
     {
         return self::forceHtml($set);
@@ -901,9 +952,11 @@ class Dbgr
 
     /**
      * Sets where setFile will write output
+     *
      * @param string $logDir
+     *
      * @return Dbgr
-*/
+     */
     public static function setLogDir(string $logDir): self
     {
         self::$logDir = rtrim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
@@ -919,7 +972,7 @@ class Dbgr
      * @param mixed[] $args
      *
      * @return Dbgr
-*/
+     */
     public static function dumpConditional(string $conditionName, ...$args): self
     {
         if (isset(self::$condition[$conditionName]) && self::$condition[$conditionName]) {
@@ -940,7 +993,7 @@ class Dbgr
      * @param mixed[] ...$args
      *
      * @return Dbgr
-*/
+     */
     public static function dumpOnTrue(bool $condition, ...$args): self
     {
         if ($condition === true) {
@@ -956,10 +1009,12 @@ class Dbgr
 
     /**
      * alias of condition
+     *
      * @param string $conditionName
      * @param bool $value
+     *
      * @return Dbgr
-*/
+     */
     public static function setCondition(string $conditionName, bool $value): self
     {
         return self::condition($conditionName, $value);
@@ -967,10 +1022,12 @@ class Dbgr
 
     /**
      * Set condition to control dumpConditional calls
+     *
      * @param string $conditionName
      * @param bool $value
+     *
      * @return Dbgr
-*/
+     */
     public static function condition(string $conditionName, bool $value): self
     {
         self::$condition[$conditionName] = $value;
@@ -1017,6 +1074,18 @@ class Dbgr
         if ($printAfter && $count % $printAfter === 0) {
             self::echo($count . '/' . self::$counterTotal[$name] . ' (' . $name . ')');
         }
+
+        return self::getInstance();
+    }
+
+    /**
+     * @param bool $forceDevelopmentMode
+     *
+     * @return Dbgr
+     */
+    public static function forceDevelopmentMode(bool $forceDevelopmentMode = true): Dbgr
+    {
+        self::$forceDevelopmentMode = $forceDevelopmentMode;
 
         return self::getInstance();
     }

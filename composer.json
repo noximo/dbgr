@@ -23,7 +23,6 @@
     "tracy/tracy": "^2.5",
     "ext-json": "*",
     "nette/utils": "^2.5",
-    "nette/neon": "^2.4"
   },
   "license": "MIT",
   "require-dev": {
