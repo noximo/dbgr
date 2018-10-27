@@ -1,10 +1,10 @@
 <?php
-declare(strict_types = 1);
+
+declare(strict_types=1);
 
 namespace noximo;
 
 use Countable;
-use Nette\IOException;
 use Nette\Neon\Neon;
 use Nette\Utils\DateTime;
 use Nette\Utils\FileSystem;
@@ -19,40 +19,103 @@ use Tracy\Helpers;
  */
 class Dbgr
 {
-
-    /** @var Dbgr */
+    /**
+     * @var Dbgr
+     */
     private static $instance;
+
     /** @var bool */
     private static $stylesPrinted;
+
+    /**
+     * @var bool
+     */
     private static $even = false;
+
     /** @var ?string */
     private static $color;
+
     /** @var ?string */
     private static $name;
+
     /** @var ?string */
     private static $file;
+
+    /**
+     * @var bool
+     */
     private static $isAjax = false;
+
+    /**
+     * @var bool
+     */
     private static $forceHTML = false;
+
+    /**
+     * @var string[]
+     */
     private static $fileOutputs = [];
+
+    /**
+     * @var bool
+     */
     private static $isConsole = false;
+
     /** @var string */
     private static $logDir;
+
+    /**
+     * @var bool[]
+     */
     private static $condition = [];
+
+    /**
+     * @var int[]
+     */
     private static $counter = [];
+
+    /**
+     * @var int[]
+     */
     private static $counterTotal = [];
+
+    /**
+     * @var mixed[]
+     */
     private static $dumperOptions = [];
+
+    /**
+     * @var string
+     */
     private static $output = '';
+
+    /**
+     * @var string[]
+     */
     private static $allOutputs = [];
+
+    /**
+     * @var float
+     */
     private static $firstTimer;
+
+    /**
+     * @var float
+     */
     private static $lastTimer;
+
     /** @var int */
     private static $dieAfter;
-    /** @var array */
+
+    /** @var string[] */
     private static $localIPAddresses = ['127.0.0.1', '0.0.0.0', 'localhost', '::1'];
-    /** @var array */
+
+    /** @var string[] */
     private static $allowedIPAddresses = [];
+
     /** @var string */
     private static $adminerUrlLink;
+
     /** @var string */
     private static $adminerDatabaseName;
 
@@ -63,10 +126,8 @@ class Dbgr
 
     /**
      * @param string|null $file
-     *
-     * @return void
      */
-    public static function loadConfig($file = null): void
+    public static function loadConfig(?string $file = null): void
     {
         $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'default.neon');
         $config = Neon::decode($defaultFile);
@@ -81,14 +142,17 @@ class Dbgr
             $customConfig = Neon::decode($content);
         }
 
-        $config = array_replace($config, $customConfig);
+        $config = array_merge_recursive($config, $customConfig);
 
         self::$logDir = $config['logDir'] . DIRECTORY_SEPARATOR;
         self::$allowedIPAddresses = $config['allowedIPAddresses'] ?? null;
-        self:: $adminerUrlLink = $config['adminerUrlLink'] ?? null;
+        self::$adminerUrlLink = $config['adminerUrlLink'] ?? null;
         self::$adminerDatabaseName = $config['adminerDatabaseName'] ?? null;
 
-        if (isset($config['editorUri']) && $config['editorUri'] !== null && $config['editorUri'] !== '' && $config['editorUri'] !== Debugger::$editor) {
+        if (isset($config['editorUri']) &&
+            $config['editorUri'] !== null &&
+            $config['editorUri'] !== '' &&
+            $config['editorUri'] !== Debugger::$editor) {
             /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
             Debugger::$editor = $config['editorUri'];
         }
@@ -101,7 +165,7 @@ class Dbgr
      *
      * @return Dbgr
      */
-    public static function setName(string $name): Dbgr
+    public static function setName(string $name): self
     {
         self::$name = $name;
 
@@ -111,10 +175,10 @@ class Dbgr
     /**
      * @return Dbgr
      */
-    public static function getInstance(): Dbgr
+    public static function getInstance(): self
     {
         if (self::$instance === null) {
-            self::$instance = new Dbgr();
+            self::$instance = new self();
         }
 
         return self::$instance;
@@ -122,12 +186,10 @@ class Dbgr
 
     /**
      * Nastaví do jaké hloubky se mají vypsat proměnné
-     *
      * @param int $depth
-     *
      * @return Dbgr
-     */
-    public static function setDepth($depth): Dbgr
+*/
+    public static function setDepth(int $depth): self
     {
         self::defaultOptions();
         self::$dumperOptions[Dumper::DEPTH] = $depth;
@@ -137,10 +199,9 @@ class Dbgr
 
     /**
      * Nastaví výchozí nastavení
-     *
      * @param bool $reset
-     */
-    public static function defaultOptions($reset = false): void
+*/
+    public static function defaultOptions(bool $reset = false): void
     {
         if ($reset || empty(self::$dumperOptions)) {
             self::$dumperOptions = [
@@ -148,18 +209,18 @@ class Dbgr
                 Dumper::TRUNCATE => 1024,
                 Dumper::COLLAPSE => false,
                 Dumper::COLLAPSE_COUNT => 15,
+                Dumper::DEBUGINFO => true,
+                Dumper::LOCATION => Dumper::LOCATION_CLASS,
             ];
         }
     }
 
     /**
      * Nastaví zápis debugu do souboru
-     *
      * @param string $filename
-     *
      * @return Dbgr
-     */
-    public static function setFile($filename): Dbgr
+*/
+    public static function setFile(string $filename): self
     {
         $filename = str_replace('.html', '', $filename) . '.html';
         self::$file = $filename;
@@ -175,7 +236,7 @@ class Dbgr
      *
      * @return Dbgr
      */
-    public static function forceHtml($set = true): Dbgr
+    public static function forceHtml(bool $set = true): self
     {
         self::$forceHTML = $set;
 
@@ -197,12 +258,10 @@ class Dbgr
 
     /**
      * Nastaví barvu výpisu
-     *
      * @param string $color
-     *
      * @return Dbgr
-     */
-    public static function setColor($color): Dbgr
+*/
+    public static function setColor(string $color): self
     {
         self::$color = $color;
 
@@ -211,9 +270,8 @@ class Dbgr
 
     /**
      * @param array $backtrace
-     *
-     * @return array
-     */
+     * @return string[]
+*/
     private static function getParams(array $backtrace): array
     {
         $file = file($backtrace[0]['file']);
@@ -259,9 +317,12 @@ class Dbgr
      */
     private static function debugStart(string $hash): void
     {
-        if (self::$forceHTML === false && !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        if (self::$forceHTML === false &&
+            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             self::$isAjax = true;
         }
+
         if (PHP_SAPI === 'cli') {
             self::$isConsole = true;
         }
@@ -291,16 +352,16 @@ class Dbgr
     /**
      * @param string $output
      * @param string|null $endofline
-     */
+*/
     private static function addToOutput(string $output, ?string $endofline = PHP_EOL): void
     {
         self::$output .= $output . $endofline;
     }
 
     /**
-     * @param array $args
-     * @param array $backtrace
-     * @param array $params
+     * @param string[] $args
+     * @param string[] $backtrace
+     * @param string[] $params
      *
      * @return string
      */
@@ -310,7 +371,7 @@ class Dbgr
     }
 
     /**
-     * @param array $backtrace
+     * @param string[] $backtrace
      */
     private static function firstBacktrace(array $backtrace): void
     {
@@ -330,7 +391,7 @@ class Dbgr
     }
 
     /**
-     * @param array $backtrace
+     * @param string[] $backtrace
      *
      * @return mixed
      */
@@ -355,7 +416,7 @@ class Dbgr
     /**
      * @param array $backtrace
      * @param bool|null $first
-     */
+*/
     private static function printHeader(array $backtrace, ?bool $first = null): void
     {
         $first = $first ?? null;
@@ -384,7 +445,7 @@ class Dbgr
     }
 
     /**
-     * @param array $backtrace
+     * @param string[] $backtrace
      *
      * @return string
      */
@@ -407,13 +468,14 @@ class Dbgr
     }
 
     /**
-     * @param array $backtrace
+     * @param string[] $backtrace
      *
      * @return string
      */
     public static function getOpenInIDEBacktrace(array $backtrace): string
     {
-        $line = "<a title='Otevřít v editoru' href='" . self::getOpenInIDELink($backtrace['file'], $backtrace['line']) . "'><small>" . \dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
+        $link = self::getOpenInIDELink($backtrace['file'], (int) $backtrace['line']);
+        $line = "<a title='Otevřít v editoru' href='" . $link . "'><small>" . \dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
 
         if (isset($backtrace['line'])) {
             $line .= ' (' . $backtrace['line'] . ')';
@@ -441,7 +503,8 @@ class Dbgr
     private static function restOftheBacktraces(array $backtrace): void
     {
         self::addToOutput('<div class="debug-backtraces" style="display:none;" >');
-        for ($i = \count($backtrace) - 1; $i >= 0; $i--) {
+        /** @var int $i */
+        for ($i = count($backtrace) - 1; $i >= 0; $i--) {
             $param = $backtrace[$i];
             self::addToOutput("<div class='debug-backtrace'>");
             if ($i + 1 > 0) {
@@ -470,8 +533,8 @@ class Dbgr
     }
 
     /**
-     * @param array $variables
-     * @param array $params
+     * @param mixed[] $variables
+     * @param mixed[] $params
      */
     private static function printVariables(array $variables, array $params): void
     {
@@ -490,9 +553,9 @@ class Dbgr
             } elseif ($variable instanceof Throwable) {
                 /** @var Throwable $variable */
                 self::addToOutput(self::useDumper($variable), null);
-                self::_printBacktraces($variable->getTrace());
+                self::printBacktraces($variable->getTrace());
             } elseif (self::isBacktrace($variable)) {
-                self::_printBacktraces($variable);
+                self::printBacktraces($variable);
             } else {
                 self::addToOutput(self::useDumper($variable), null);
             }
@@ -510,7 +573,7 @@ class Dbgr
         $keywords1 = 'CREATE\s+TABLE|CREATE(?:\s+UNIQUE)?\s+INDEX|SELECT|SHOW|TABLE|STATUS|FULL|COLUMNS|JOIN|UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
         $keywords2 = 'ALL|DISTINCT|DISTINCTROW|AS|USING|ON|AND|OR|IN|IS|NOT|NULL|LIKE|TRUE|FALSE|INTEGER|CLOB|VARCHAR|DATETIME|TIME|DATE|INT|SMALLINT|BIGINT|BOOL|BOOLEAN|DECIMAL|FLOAT|TEXT|VARCHAR|DEFAULT|AUTOINCREMENT|DESC|PRIMARY\s+KEY';
 
-        $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#si";
+        $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         preg_match($patter, strtoupper($sql), $matches);
         if (!empty($matches)) {
             return true;
@@ -530,42 +593,43 @@ class Dbgr
         $keywords2 = 'ALL|DISTINCT|DISTINCTROW|AS|USING|ON|AND|OR|IN|IS|NOT|NULL|LIKE|TRUE|FALSE|INTEGER|CLOB|VARCHAR|DATETIME|TIME|DATE|INT|SMALLINT|BIGINT|BOOL|BOOLEAN|DECIMAL|FLOAT|TEXT|VARCHAR|DEFAULT|AUTOINCREMENT|DESC|PRIMARY\s+KEY';
         $break = '<br>';
         // insert new lines - too dizzy
-        $sql = " $sql ";
+        $sql = " ${sql} ";
 
         // reduce spaces
         $sql = wordwrap($sql, 100);
-        $sql = preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
-        $sql = preg_replace("#VARCHAR\\(#", 'VARCHAR (', $sql);
+        $sql = (string) preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
+        $sql = (string) preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
         $sql = str_replace('            ', ' ', $sql);
 
         // syntax highlight
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
-        $sql = preg_replace_callback(
-            "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#si",
-            function ($matches) use ($break) {
-                if (!empty($matches[1])) {// comment
-                    return '<em style="color:gray">' . $matches[1] . '</em>';
-                }
+        $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
+        $sql = (string) preg_replace_callback($pattern, function ($matches) use ($break) {
+            if (!empty($matches[1])) {
+                // comment
+                return '<em style="color:gray">' . $matches[1] . '</em>';
+            }
 
-                if (!empty($matches[2])) {// error
-                    return '<strong style="color:red">' . $matches[2] . '</strong>';
-                }
+            if (!empty($matches[2])) {
+                // error
+                return '<strong style="color:red">' . $matches[2] . '</strong>';
+            }
 
-                if (!empty($matches[3])) {// most important keywords
-                    return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
-                }
+            if (!empty($matches[3])) {
+                // most important keywords
+                return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
+            }
 
-                if (!empty($matches[4])) {// other keywords
-                    return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
-                }
+            if (!empty($matches[4])) {
+                // other keywords
+                return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
+            }
 
-                return '';
-            },
-            $sql
-        );
-        $sql = trim(preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
+            return '';
+        }, $sql);
+        $sql = trim((string) preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
 
-        return "<span class='dump'>$sql</span>";
+        return "<span class='dump'>${sql}</span>";
     }
 
     /**
@@ -580,7 +644,7 @@ class Dbgr
             $query = [
                 'username' => 'develop',
                 'db' => self::$adminerDatabaseName,
-                'sql' => trim(preg_replace('/[ \t]+/', ' ', $sql)),
+                'sql' => trim((string) preg_replace('/[ \t]+/', ' ', $sql)),
             ];
             $return = '<a class="debug-sql-link" target="_blank" href="' . self::$adminerUrlLink . '?' . http_build_query($query) . '">Otevřít v admineru</a>';
         }
@@ -634,9 +698,9 @@ class Dbgr
     }
 
     /**
-     * @param array $backtraces
+     * @param string[][] $backtraces
      */
-    private static function _printBacktraces(array $backtraces): void
+    private static function printBacktraces(array $backtraces): void
     {
         self::addToOutput('<div class="debug-backtrace-as-variable">');
         foreach ($backtraces as $i => $backtrace) {
@@ -655,7 +719,8 @@ class Dbgr
      */
     private static function isBacktrace($variable): bool
     {
-        return isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']);
+        return \is_array($variable) &&
+            (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
 
     private static function debugEnd(): void
@@ -719,12 +784,12 @@ class Dbgr
      *
      * @param string $message
      * @param bool $bold Should message be bolder?
+     *
      * @param bool $showTime
      * @param bool $stripTags
-     *
      * @return Dbgr
-     */
-    public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): Dbgr
+*/
+    public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
     {
         if ($bold) {
             $message = '<b>' . $message . '</b>';
@@ -753,7 +818,13 @@ class Dbgr
      */
     private static function ajaxOutput()
     {
-        return str_replace('x//', '', preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output)));
+        if (\is_string(self::$output)) {
+            $pregReplace = (string) preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
+
+            return str_replace('x//', '', $pregReplace);
+        }
+
+        return '';
     }
 
     /**
@@ -779,8 +850,8 @@ class Dbgr
      * @param mixed $variable
      *
      * @return Dbgr
-     */
-    public static function dieAfter($count, $variable = 'not_set'): Dbgr
+*/
+    public static function dieAfter(int $count, $variable = 'not_set'): self
     {
         if (self::$dieAfter === null) {
             self::$dieAfter = $count - 1;
@@ -804,11 +875,11 @@ class Dbgr
     /**
      * Dump any number of variables
      *
-     * @param mixed ...$variables
+     * @param mixed[] $variables
      *
      * @return Dbgr
      */
-    public static function dump(...$variables): Dbgr
+    public static function dump(...$variables): self
     {
         self::defaultOptions();
         $backtrace = debug_backtrace();
@@ -821,23 +892,19 @@ class Dbgr
 
     /**
      * @param bool $set
-     *
      * @return Dbgr
-     */
-    public static function noAjax(bool $set = true): Dbgr
+*/
+    public static function noAjax(bool $set = true): self
     {
         return self::forceHtml($set);
     }
 
     /**
      * Sets where setFile will write output
-     *
      * @param string $logDir
-     *
-     * @throws IOException
      * @return Dbgr
-     */
-    public static function setLogDir(string $logDir): Dbgr
+*/
+    public static function setLogDir(string $logDir): self
     {
         self::$logDir = rtrim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         FileSystem::createDir(self::$logDir);
@@ -849,11 +916,11 @@ class Dbgr
      * Dump only if previously set condition is true. Use method condition to set up condition
      *
      * @param string $conditionName
-     * @param mixed ...$args
+     * @param mixed[] $args
      *
      * @return Dbgr
-     */
-    public static function dumpConditional(string $conditionName, ...$args): Dbgr
+*/
+    public static function dumpConditional(string $conditionName, ...$args): self
     {
         if (isset(self::$condition[$conditionName]) && self::$condition[$conditionName]) {
             self::defaultOptions();
@@ -870,11 +937,11 @@ class Dbgr
      * Dumps only if first parameter is true. Use condition() and dumpConditional() for better versatility
      *
      * @param bool $condition
-     * @param mixed ...$args
+     * @param mixed[] ...$args
      *
      * @return Dbgr
-     */
-    public static function dumpOnTrue(bool $condition, ...$args): Dbgr
+*/
+    public static function dumpOnTrue(bool $condition, ...$args): self
     {
         if ($condition === true) {
             self::defaultOptions();
@@ -889,26 +956,22 @@ class Dbgr
 
     /**
      * alias of condition
-     *
      * @param string $conditionName
      * @param bool $value
-     *
      * @return Dbgr
-     */
-    public static function setCondition(string $conditionName, bool $value): Dbgr
+*/
+    public static function setCondition(string $conditionName, bool $value): self
     {
         return self::condition($conditionName, $value);
     }
 
     /**
      * Set condition to control dumpConditional calls
-     *
      * @param string $conditionName
      * @param bool $value
-     *
      * @return Dbgr
-     */
-    public static function condition(string $conditionName, bool $value): Dbgr
+*/
+    public static function condition(string $conditionName, bool $value): self
     {
         self::$condition[$conditionName] = $value;
 
@@ -919,15 +982,15 @@ class Dbgr
      * Set new counter. Use before incrementCounter
      *
      * @param string $name Name of the counter
-     * @param int|array|Countable $count Total count
+     * @param int|mixed[]|Countable $count Total count
      *
      * @return Dbgr
      * @throws RuntimeException
      */
-    public static function setCounter(string $name, $count): Dbgr
+    public static function setCounter(string $name, $count): self
     {
         if ($count instanceof Countable || \is_array($count)) {
-            $count = \count($count);
+            $count = count($count);
         }
 
         if (!\is_int($count)) {
@@ -948,7 +1011,7 @@ class Dbgr
      *
      * @return Dbgr
      */
-    public static function incrementCounter(string $name, int $printAfter = 1): Dbgr
+    public static function incrementCounter(string $name, int $printAfter = 1): self
     {
         $count = self::$counter[$name]++;
         if ($printAfter && $count % $printAfter === 0) {
