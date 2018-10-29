@@ -18,6 +18,11 @@
     padding-top: 5px;
 }
 
+.debug-didYouKnow {
+    padding: 5px;
+    color: lightslategrey;
+}
+
 .debug-inline:hover {
     position: relative;
     z-index: 9999;
@@ -82,6 +87,8 @@
 
 .debug-sql {
     position: relative;
+    background: white;
+    padding: 3px;
 }
 
 .debug-sql-link {
@@ -90,58 +97,11 @@
     right: 5px;
 }
 
-/* toggle */
-.tracy-collapsed {
-
-}
-
-.tracy-toggle.tracy-collapsed {
-    display: inline;
-}
-
 /* dump */
 pre.tracy-dump {
     text-align: left;
     color: #444;
     font-size: 12px !important;
     margin: 0;
-}
-
-pre.tracy-dump div {
-    padding-left: 3ex;
-    max-width: 600px;
-}
-
-pre.tracy-dump div div {
-    border-left: 1px solid rgba(0, 0, 0, .1);
-    margin-left: .5ex;
-}
-
-.tracy-dump-array, .tracy-dump-object {
-    color: #C22;
-}
-
-.tracy-dump-string {
-    color: #35D;
-}
-
-.tracy-dump-number {
-    color: #090;
-}
-
-.tracy-dump-null, .tracy-dump-bool {
-    color: #850;
-}
-
-.tracy-dump-visibility, .tracy-dump-hash {
-    font-size: 85%;
-    color: #999;
-}
-
-.tracy-dump-indent {
-    display: none;
-}
-
-span[data-tracy-href] {
-    border-bottom: 1px dotted rgba(0, 0, 0, .2);
+    padding: 3px;
 }

@@ -1,0 +1,5 @@
+parameters:
+    ignoreErrors:
+        - '#Function posix_isatty not found.#'
+
+includes:

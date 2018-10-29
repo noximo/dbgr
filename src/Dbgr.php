@@ -6,8 +6,11 @@ namespace noximo;
 
 use Countable;
 use Nette\FileNotFoundException;
+use Nette\IOException;
 use Nette\Utils\DateTime;
 use Nette\Utils\FileSystem;
+use Nette\Utils\Json;
+use Nette\Utils\JsonException;
 use RuntimeException;
 use Throwable;
 use Tracy\Debugger;
@@ -112,6 +115,7 @@ class Dbgr
 
     /** @var bool */
     private static $forceDevelopmentMode = false;
+
     /** @var string[] */
     private static $allowedIPAddresses = [];
 
@@ -120,56 +124,66 @@ class Dbgr
 
     /** @var string */
     private static $adminerDatabaseName;
+
+    /** @var string */
+    private static $adminerUsername;
+
+    /** @var mixed[] */
     private static $config;
 
+    /** @var bool */
+    private static $initialized = false;
+
+    /**
+     * Dbgr constructor.
+     * @throws JsonException
+     */
     public function __construct()
     {
         self::loadDefaultConfig();
     }
 
     /**
-     * @param string|null $file
+     * @throws JsonException
+     * @throws IOException
      */
     public static function loadDefaultConfig(): void
     {
-        $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR);
-        self::$config = json_decode($defaultFile);
+        if (self::$initialized) {
+            return;
+        }
+        $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
+        self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
 
         $localFile = \dirname(__FILE__, 3) . DIRECTORY_SEPARATOR . 'dbgr.json';
         $customConfig = [];
         if (file_exists($localFile)) {
             $content = FileSystem::read($localFile);
-            $customConfig = json_decode($content);
+            $customConfig = Json::decode($content, Json::FORCE_ARRAY);
         }
 
-        self::setConfig($customConfig);
+        self::setConfigData($customConfig);
+        self::$initialized = true;
     }
 
     /**
-     * @param array $customConfig
+     * @param mixed[] $customConfig
+     *
+     * @return Dbgr
+     * @throws JsonException
      */
     public static function setConfig(array $customConfig): self
     {
-        self::$config = array_merge_recursive(self::$config, $customConfig);
+        self::loadDefaultConfig();
 
-        self::$logDir = self::$config['logDir'] . DIRECTORY_SEPARATOR;
-        self::$allowedIPAddresses = self::$config['allowedIPAddresses'] ?? null;
-        self::$adminerUrlLink = self::$config['adminerUrlLink'] ?? null;
-        self::$adminerDatabaseName = self::$config['adminerDatabaseName'] ?? null;
-
-        if (isset(self::$config['editorUri']) &&
-            self::$config['editorUri'] !== null &&
-            self::$config['editorUri'] !== '' &&
-            self::$config['editorUri'] !== Debugger::$editor) {
-            /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
-            Debugger::$editor = self::$config['editorUri'];
-        }
+        self::setConfigData($customConfig);
 
         return self::getInstance();
     }
 
     /**
      * @return Dbgr
+     * @throws JsonException
      */
     public static function getInstance(): self
     {
@@ -181,33 +195,36 @@ class Dbgr
     }
 
     /**
-     * @param $file
-     *
      * @return Dbgr
+     * @throws JsonException
+     * @throws IOException
      */
-    public static function loadConfig($file): Dbgr
+    public static function loadConfig(string $filefilename): self
     {
-        if (file_exists($file)) {
-            $content = FileSystem::read($file);
-            $customConfig = json_decode($content);
+        self::loadDefaultConfig();
 
-            self::setConfig($customConfig);
+        if (file_exists($filefilename)) {
+            $content = FileSystem::read($filefilename);
+            $customConfig = Json::decode($content, Json::FORCE_ARRAY);
+
+            self::setConfigData($customConfig);
 
             return self::getInstance();
         }
 
-        throw new FileNotFoundException('Configuration file ' . $file . ' not found');
+        throw new FileNotFoundException('Configuration file ' . $filefilename . ' not found');
     }
 
     /**
      * Set name for debug
      *
-     * @param string $name
-     *
      * @return Dbgr
+     * @throws JsonException
      */
     public static function setName(string $name): self
     {
+        self::loadDefaultConfig();
+
         self::$name = $name;
 
         return self::getInstance();
@@ -216,12 +233,13 @@ class Dbgr
     /**
      * Nastaví do jaké hloubky se mají vypsat proměnné
      *
-     * @param int $depth
-     *
      * @return Dbgr
+     * @throws JsonException
      */
     public static function setDepth(int $depth): self
     {
+        self::loadDefaultConfig();
+
         self::defaultOptions();
         self::$dumperOptions[Dumper::DEPTH] = $depth;
 
@@ -230,17 +248,18 @@ class Dbgr
 
     /**
      * Nastaví výchozí nastavení
-     *
-     * @param bool $reset
+     * @throws JsonException
      */
     public static function defaultOptions(bool $reset = false): void
     {
+        self::loadDefaultConfig();
+
         if ($reset || empty(self::$dumperOptions)) {
             self::$dumperOptions = [
-                Dumper::DEPTH => 4,
+                Dumper::DEPTH => false,
                 Dumper::TRUNCATE => 1024,
                 Dumper::COLLAPSE => false,
-                Dumper::COLLAPSE_COUNT => 15,
+                Dumper::COLLAPSE_COUNT => 7,
                 Dumper::DEBUGINFO => true,
                 Dumper::LOCATION => Dumper::LOCATION_CLASS,
             ];
@@ -251,12 +270,15 @@ class Dbgr
     /**
      * Output dump into file. Multiple calls with same filename will be merged into one file.
      *
-     * @param string $filename
+     * @param string|null $filename
      *
      * @return Dbgr
+     * @throws JsonException
      */
-    public static function setFile(string $filename = null): self
+    public static function setFile(?string $filename = null): self
     {
+        self::loadDefaultConfig();
+
         if ($filename === null) {
             $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
             $params = self::getParams($backtrace);
@@ -270,7 +292,304 @@ class Dbgr
     }
 
     /**
-     * @param array $backtrace
+     * Should dumped data always print out formatted as HTML?
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function forceHtml(bool $set = true): self
+    {
+        self::loadDefaultConfig();
+        self::$forceHTML = $set;
+
+        return self::getInstance();
+    }
+
+    /**
+     * End script execution instantly and loudly.
+     *
+     * @throws JsonException
+     */
+    public static function dieNow(bool $force = false): void
+    {
+        self::loadDefaultConfig();
+
+        if ($force || self::canBeOutputed()) {
+            self::setColor('red');
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $params = self::getParams($backtrace);
+            self::debugProccess(['SCRIPT FORCEFULLY ENDED'], $backtrace, $params);
+
+            die();
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public static function canBeOutputed(): bool
+    {
+        self::loadDefaultConfig();
+
+        $addresses = array_merge(self::$localIPAddresses, self::$allowedIPAddresses);
+
+        return self::$forceDevelopmentMode || Debugger::detectDebugMode($addresses);
+    }
+
+    /**
+     * Nastaví barvu výpisu
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function setColor(string $color): self
+    {
+        self::loadDefaultConfig();
+        self::$color = $color;
+
+        return self::getInstance();
+    }
+
+    /**
+     * Instantly prints out message
+     *
+     * @param bool $bold Should message be bolder?
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
+    {
+        self::loadDefaultConfig();
+
+        if ($bold) {
+            $message = '<b>' . $message . '</b>';
+        }
+        if ($showTime) {
+            $message = date('Y-m-d H:i:s') . ' - ' . $message;
+        }
+        if (PHP_SAPI !== 'cli') {
+            echo $message;
+        } elseif ($stripTags) {
+            echo strip_tags($message);
+        } else {
+            echo $message;
+        }
+        echo PHP_EOL;
+        /** @noinspection PhpUsageOfSilenceOperatorInspection */
+        @flush();
+        /** @noinspection PhpUsageOfSilenceOperatorInspection */
+        @ob_flush();
+
+        return self::getInstance();
+    }
+
+    /**
+     * Stop script execution after $count calls. Can output variable
+     *
+     * @param mixed $variable
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function dieAfter(int $count, bool $force = false, $variable = 'not_set'): self
+    {
+        self::loadDefaultConfig();
+
+        if ($force || self::canBeOutputed()) {
+            if (self::$dieAfter === null) {
+                self::$dieAfter = $count - 1;
+            } else {
+                self::$dieAfter--;
+                if (self::$dieAfter === 0) {
+                    if ($variable !== 'not_set') {
+                        self::dump($variable);
+                    }
+                    self::setColor('red');
+                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+                    self::debugProccess(['END' => 'SCRIPT FORCEFULLY STOPPED AFTER' . $count . ' CALLS'], $backtrace, ['END' => 'END']);
+
+                    die();
+                }
+            }
+        }
+
+        return self::getInstance();
+    }
+
+    /**
+     * Dump any number of variables
+     *
+     * @param mixed ...$variables
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function dump(...$variables): self
+    {
+        self::loadDefaultConfig();
+        self::defaultOptions();
+
+        $backtrace = debug_backtrace();
+        $params = self::getParams($backtrace);
+
+        self::debugProccess($variables, $backtrace, $params);
+
+        return self::getInstance();
+    }
+
+    /**
+     * Sets where setFile will write output
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function setLogDir(string $logDir): self
+    {
+        self::loadDefaultConfig();
+
+        self::$logDir = rtrim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        FileSystem::createDir(self::$logDir);
+
+        return self::getInstance();
+    }
+
+    /**
+     * Dump only if previously set condition is true. Use method condition to set up condition
+     *
+     * @param mixed ...$args
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function dumpConditional(string $conditionName, ...$args): self
+    {
+        self::loadDefaultConfig();
+
+        if (isset(self::$condition[$conditionName]) && self::$condition[$conditionName]) {
+            self::defaultOptions();
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $params = self::getParams($backtrace);
+
+            self::debugProccess($args, $backtrace, $params);
+        }
+
+        return self::getInstance();
+    }
+
+    /**
+     * Dumps only if first parameter is true. Use condition() and dumpConditional() for better versatility
+     *
+     * @param mixed ...$args
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function dumpOnTrue(bool $condition, ...$args): self
+    {
+        self::loadDefaultConfig();
+
+        if ($condition === true) {
+            self::defaultOptions();
+            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+            $params = self::getParams($backtrace);
+
+            self::debugProccess($args, $backtrace, $params);
+        }
+
+        return self::getInstance();
+    }
+
+    /**
+     * alias of condition
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function setCondition(string $conditionName, bool $value): self
+    {
+        self::loadDefaultConfig();
+
+        return self::condition($conditionName, $value);
+    }
+
+    /**
+     * Set condition to control dumpConditional calls
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function condition(string $conditionName, bool $value): self
+    {
+        self::loadDefaultConfig();
+
+        self::$condition[$conditionName] = $value;
+
+        return self::getInstance();
+    }
+
+    /**
+     * Set new counter. Use before incrementCounter
+     *
+     * @param string $name Name of the counter
+     * @param int|mixed[]|Countable $count Total count
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function setCounter(string $name, $count): self
+    {
+        self::loadDefaultConfig();
+
+        if ($count instanceof Countable || \is_array($count)) {
+            $count = count($count);
+        }
+
+        if (! \is_int($count)) {
+            throw new RuntimeException('Argument is not countable');
+        }
+
+        self::$counter[$name] = 0;
+        self::$counterTotal[$name] = $count;
+
+        return self::getInstance();
+    }
+
+    /**
+     * Increments counter. Use after counter is set using setCounter
+     *
+     * @param string $name Counter to increment
+     * @param int $printAfter After how many increments should be counter printed? (0 = never)
+     *
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function incrementCounter(string $name, int $printAfter = 1): self
+    {
+        self::loadDefaultConfig();
+
+        $count = self::$counter[$name]++;
+        if ($printAfter && $count % $printAfter === 0) {
+            self::echo($count . '/' . self::$counterTotal[$name] . ' (' . $name . ')');
+        }
+
+        return self::getInstance();
+    }
+
+    /**
+     * @return Dbgr
+     * @throws JsonException
+     */
+    public static function forceDevelopmentMode(bool $forceDevelopmentMode = true): self
+    {
+        self::loadDefaultConfig();
+
+        self::$forceDevelopmentMode = $forceDevelopmentMode;
+
+        return self::getInstance();
+    }
+
+    /**
+     * @param mixed[] $backtrace
      *
      * @return string[]
      */
@@ -290,10 +609,8 @@ class Dbgr
 
     /**
      * @param string[] $args
-     * @param string[] $backtrace
+     * @param mixed[] $backtrace
      * @param string[] $params
-     *
-     * @return string
      */
     private static function getHash(array $args, array $backtrace, array $params): string
     {
@@ -301,64 +618,12 @@ class Dbgr
     }
 
     /**
-     * Should dumped data always print out formatted as HTML?
+     * @param mixed[] $args
+     * @param mixed[] $backtrace
+     * @param string[] $params
      *
-     * @param bool $set Vypsat?
-     *
-     * @return Dbgr
-     */
-    public static function forceHtml(bool $set = true): self
-    {
-        self::$forceHTML = $set;
-
-        return self::getInstance();
-    }
-
-    /**
-     * End script execution instantly and loudly.
-     *
-     * @param bool $force
-     */
-    public static function dieNow(bool $force = false): void
-    {
-        if ($force || self::canBeOutputed()) {
-            self::setColor('red');
-            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
-            self::debugProccess(['SCRIPT FORCEFULLY ENDED'], $backtrace, $params);
-
-            die();
-        }
-    }
-
-    /**
-     * @return bool
-     */
-    public static function canBeOutputed(): bool
-    {
-        $addresses = array_merge(self::$localIPAddresses, self::$allowedIPAddresses);
-
-        return self::$forceDevelopmentMode || Debugger::detectDebugMode($addresses);
-    }
-
-    /**
-     * Nastaví barvu výpisu
-     *
-     * @param string $color
-     *
-     * @return Dbgr
-     */
-    public static function setColor(string $color): self
-    {
-        self::$color = $color;
-
-        return self::getInstance();
-    }
-
-    /**
-     * @param array $args
-     * @param array $backtrace
-     * @param array $params
+     * @throws JsonException
+     * @throws \Exception
      */
     private static function debugProccess(array $args, array $backtrace, array $params): void
     {
@@ -366,12 +631,13 @@ class Dbgr
         self::debugStart(self::getHash($args, $backtrace, $params));
 
         self::firstBacktrace($backtrace);
-        if (!self::$isAjax && !self::$isConsole) {
+        if (! self::$isAjax && ! self::$isConsole) {
             self::restOftheBacktraces($backtrace);
         }
 
         self::printVariables($args, $params);
 
+        self::printDidYouKnow();
         self::debugEnd();
         self::printOutput();
     }
@@ -382,12 +648,12 @@ class Dbgr
     }
 
     /**
-     * @param string $hash
+     * @throws JsonException
      */
     private static function debugStart(string $hash): void
     {
         if (self::$forceHTML === false &&
-            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            ! empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             self::$isAjax = true;
         }
@@ -397,7 +663,7 @@ class Dbgr
         }
 
         $color = self::$even ? 'lightyellow' : 'rgb(255, 255, 187)';
-        self::$even = !self::$even;
+        self::$even = ! self::$even;
 
         $borderColor = self::colorize();
 
@@ -405,9 +671,6 @@ class Dbgr
         self::addToOutput("<div class='debug-inline hash-" . $hash . "' style='background-color:" . $color . '; border-left: 6px double ' . $borderColor . ";'>");
     }
 
-    /**
-     * @return string
-     */
     private static function colorize(): string
     {
         $backtrace = base64_encode(serialize(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
@@ -419,7 +682,6 @@ class Dbgr
     }
 
     /**
-     * @param string $output
      * @param string|null $endofline
      */
     private static function addToOutput(string $output, ?string $endofline = PHP_EOL): void
@@ -428,7 +690,7 @@ class Dbgr
     }
 
     /**
-     * @param string[] $backtrace
+     * @param mixed[] $backtrace
      */
     private static function firstBacktrace(array $backtrace): void
     {
@@ -438,7 +700,7 @@ class Dbgr
             $color = 'style = "background-color:' . self::$color . ';"';
             self::$color = null;
         }
-        self::addToOutput('<div ondblclick="debugToggle(this);" class="debug-backtrace debug-backtrace-first" title="Dvojklikem zobraz podrobnosti" ' . $color . '>');
+        self::addToOutput('<div ondblclick="debugToggle(this, event);" class="debug-backtrace debug-backtrace-first" title="Hold ctrl and doubleclick to show more info" ' . $color . '>');
         if (self::$name) {
             self::addToOutput("<div class='debug-inline-name'>" . self::$name . '</div>');
             self::$name = null;
@@ -448,7 +710,7 @@ class Dbgr
     }
 
     /**
-     * @param string[] $backtrace
+     * @param mixed[] $backtrace
      *
      * @return mixed
      */
@@ -471,7 +733,7 @@ class Dbgr
     }
 
     /**
-     * @param array $backtrace
+     * @param mixed[] $backtrace
      * @param bool|null $first
      */
     private static function printHeader(array $backtrace, ?bool $first = null): void
@@ -502,9 +764,7 @@ class Dbgr
     }
 
     /**
-     * @param string[] $backtrace
-     *
-     * @return string
+     * @param mixed[] $backtrace
      */
     private static function printBacktrace(array $backtrace): string
     {
@@ -525,9 +785,7 @@ class Dbgr
     }
 
     /**
-     * @param string[] $backtrace
-     *
-     * @return string
+     * @param mixed[] $backtrace
      */
     private static function getOpenInIDEBacktrace(array $backtrace): string
     {
@@ -543,19 +801,15 @@ class Dbgr
         return $line;
     }
 
-    /**
-     * @param string $file
-     * @param int $line
-     *
-     * @return string
-     */
     private static function getOpenInIDELink(string $file, int $line): string
     {
         return Helpers::editorUri($file, $line) ?? '#';
     }
 
     /**
-     * @param array $backtrace
+     * @param mixed[] $backtrace
+     *
+     * @throws JsonException
      */
     private static function restOftheBacktraces(array $backtrace): void
     {
@@ -571,16 +825,16 @@ class Dbgr
             self::addToOutput('</div>');
         }
 
-        if (!empty($_GET)) {
+        if (! empty($_GET)) {
             self::printVariables([$_GET], ['GET']);
         }
-        if (!empty($_POST)) {
+        if (! empty($_POST)) {
             self::printVariables([$_POST], ['POST']);
         }
-        if (!empty($_SERVER)) {
+        if (! empty($_SERVER)) {
             self::printVariables([$_SERVER], ['SERVER']);
         }
-        if (!empty($_SESSION)) {
+        if (! empty($_SESSION)) {
             self::printVariables([$_SESSION], ['SESSION']);
         }
 
@@ -592,15 +846,17 @@ class Dbgr
     /**
      * @param mixed[] $variables
      * @param mixed[] $params
+     *
+     * @throws JsonException
      */
     private static function printVariables(array $variables, array $params): void
     {
         foreach ($variables as $key => $variable) {
-            if ((self::$isAjax || self::$isConsole) && !self::$file) {
+            if ((self::$isAjax || self::$isConsole) && ! self::$file) {
                 self::addToOutput('---');
             }
             self::addToOutput("<div><strong class='debug-variable-name'>" . $params[$key] . ':</strong>');
-            self::addToOutput("<pre ondblclick='debugExpand(this);' class='debug-variable'>");
+            self::addToOutput("<div ondblclick='debugExpand(this, event);' class='debug-variable'>");
 
             if (\is_string($variable) && self::isSQL($variable)) {
                 self::addToOutput("<div class='debug-sql'>");
@@ -616,15 +872,10 @@ class Dbgr
             } else {
                 self::addToOutput(self::useDumper($variable), null);
             }
-            self::addToOutput('</pre></div>');
+            self::addToOutput('</div></div>');
         }
     }
 
-    /**
-     * @param string $sql
-     *
-     * @return bool
-     */
     private static function isSQL(string $sql): bool
     {
         $keywords1 = 'CREATE\s+TABLE|CREATE(?:\s+UNIQUE)?\s+INDEX|SELECT|SHOW|TABLE|STATUS|FULL|COLUMNS|JOIN|UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
@@ -632,18 +883,13 @@ class Dbgr
 
         $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         preg_match($patter, strtoupper($sql), $matches);
-        if (!empty($matches)) {
+        if (! empty($matches)) {
             return true;
         }
 
         return false;
     }
 
-    /**
-     * @param string $sql
-     *
-     * @return string
-     */
     private static function highlight(string $sql): string
     {
         $keywords1 = 'CREATE\s+TABLE|CREATE(?:\s+UNIQUE)?\s+INDEX|SELECT|SHOW|TABLE|STATUS|FULL|COLUMNS|JOIN|UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
@@ -662,22 +908,22 @@ class Dbgr
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         $sql = (string) preg_replace_callback($pattern, function ($matches) use ($break) {
-            if (!empty($matches[1])) {
+            if (! empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
             }
 
-            if (!empty($matches[2])) {
+            if (! empty($matches[2])) {
                 // error
                 return '<strong style="color:red">' . $matches[2] . '</strong>';
             }
 
-            if (!empty($matches[3])) {
+            if (! empty($matches[3])) {
                 // most important keywords
                 return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
             }
 
-            if (!empty($matches[4])) {
+            if (! empty($matches[4])) {
                 // other keywords
                 return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
             }
@@ -690,16 +936,14 @@ class Dbgr
     }
 
     /**
-     * @param string $sql
-     *
-     * @return string
+     * @throws JsonException
      */
     private static function sqlLink(string $sql): string
     {
         $return = '';
-        if (self::$adminerDatabaseName !== null && self::$adminerUrlLink !== null && self::canBeOutputed()) {
+        if (self::$adminerDatabaseName !== null && self::$adminerDatabaseName && self::$adminerUrlLink !== null && self::canBeOutputed()) {
             $query = [
-                'username' => 'develop',
+                'username' => self::$adminerUsername,
                 'db' => self::$adminerDatabaseName,
                 'sql' => trim((string) preg_replace('/[ \t]+/', ' ', $sql)),
             ];
@@ -721,7 +965,7 @@ class Dbgr
             $options[Dumper::TRUNCATE] = false;
         }
 
-        if (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
+        if (PHP_SAPI !== 'cli' && ! preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
             $string = Dumper::toHtml($variable, $options);
         } elseif (self::detectColors()) {
             $string = Dumper::toTerminal($variable, $options);
@@ -732,9 +976,6 @@ class Dbgr
         return $string;
     }
 
-    /**
-     * @return bool
-     */
     private static function detectColors(): bool
     {
         return Dumper::$terminalColors &&
@@ -761,8 +1002,6 @@ class Dbgr
 
     /**
      * @param mixed $variable
-     *
-     * @return bool
      */
     private static function isBacktrace($variable): bool
     {
@@ -770,18 +1009,24 @@ class Dbgr
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
 
+    /**
+     * @throws JsonException
+     */
     private static function debugEnd(): void
     {
         self::defaultOptions(true);
         self::addToOutput('</div>');
     }
 
+    /**
+     * @throws JsonException
+     */
     private static function printOutput(): void
     {
         self::$allOutputs[] = self::$output;
 
-        if (!self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
-            if (!self::$stylesPrinted && !self::$isAjax) {
+        if (! self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
+            if (! self::$stylesPrinted && ! self::$isAjax) {
                 self::printStyles();
             }
             if (self::$isAjax) {
@@ -789,8 +1034,8 @@ class Dbgr
             } else {
                 self::echo(self::$output, false);
             }
-        } elseif (!empty(self::$file) && !empty(self::$logDir)) {
-            if (!isset(self::$fileOutputs[self::$file])) {
+        } elseif (! empty(self::$file) && ! empty(self::$logDir)) {
+            if (! isset(self::$fileOutputs[self::$file])) {
                 self::$fileOutputs[self::$file] = '';
             }
             self::$fileOutputs[self::$file] .= self::$output;
@@ -809,55 +1054,22 @@ class Dbgr
         self::$stylesPrinted = true;
     }
 
-    /**
-     * @return string
-     */
     private static function getStyles(): string
     {
         $styles = '';
         $path = __DIR__ . DIRECTORY_SEPARATOR;
         $styles .= '<style>';
+        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.css');
+        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.css');
         $styles .= FileSystem::read($path . 'dumper.css');
         $styles .= '</style>';
         $styles .= '<script>';
+        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.js');
+        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.js');
         $styles .= FileSystem::read($path . 'dumper.js');
         $styles .= '</script>';
 
         return $styles;
-    }
-
-    /**
-     * Instantly prints out message
-     *
-     * @param string $message
-     * @param bool $bold Should message be bolder?
-     * @param bool $showTime
-     * @param bool $stripTags
-     *
-     * @return Dbgr
-     */
-    public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
-    {
-        if ($bold) {
-            $message = '<b>' . $message . '</b>';
-        }
-        if ($showTime) {
-            $message = date('Y-m-d H:i:s') . ' - ' . $message;
-        }
-        if (PHP_SAPI !== 'cli') {
-            echo $message;
-        } elseif ($stripTags) {
-            echo strip_tags($message);
-        } else {
-            echo $message;
-        }
-        echo PHP_EOL;
-        /** @noinspection PhpUsageOfSilenceOperatorInspection */
-        @flush();
-        /** @noinspection PhpUsageOfSilenceOperatorInspection */
-        @ob_flush();
-
-        return self::getInstance();
     }
 
     /**
@@ -874,11 +1086,6 @@ class Dbgr
         return '';
     }
 
-    /**
-     * @param string $lines
-     *
-     * @return string
-     */
     private static function getHTML(string $lines): string
     {
         $html = '';
@@ -891,202 +1098,36 @@ class Dbgr
     }
 
     /**
-     * Stop script execution after $count calls. Can output variable
-     *
-     * @param int $count
-     * @param bool $force
-     * @param mixed $variable
-     *
-     * @return Dbgr
+     * @param mixed[] $customConfig
      */
-    public static function dieAfter(int $count, bool $force = false, $variable = 'not_set'): self
+    private static function setConfigData(array $customConfig): void
     {
-        if ($force || self::canBeOutputed()) {
-            if (self::$dieAfter === null) {
-                self::$dieAfter = $count - 1;
-            } else {
-                self::$dieAfter--;
-                if (self::$dieAfter === 0) {
-                    if ($variable !== 'not_set') {
-                        self::dump($variable);
-                    }
-                    self::setColor('red');
-                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-                    self::debugProccess(['END' => 'SCRIPT FORCEFULLY STOPPED AFTER' . $count . ' CALLS'], $backtrace, ['END' => 'END']);
+        self::$config = array_replace_recursive(self::$config, $customConfig);
 
-                    die();
-                }
-            }
+        self::$logDir = self::$config['logDir'] . DIRECTORY_SEPARATOR;
+        self::$allowedIPAddresses = self::$config['allowedIPAddresses'] ?? null;
+        self::$adminerUrlLink = self::$config['adminerUrlLink'] ?? null;
+        self::$adminerDatabaseName = self::$config['adminerDatabaseName'] ?? null;
+        self::$adminerUsername = self::$config['adminerUsername'] ?? null;
+
+        if (isset(self::$config['editorUri']) &&
+            self::$config['editorUri'] !== null &&
+            self::$config['editorUri'] !== '' &&
+            self::$config['editorUri'] !== Debugger::$editor) {
+            /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
+            Debugger::$editor = self::$config['editorUri'];
         }
-
-        return self::getInstance();
     }
 
     /**
-     * Dump any number of variables
-     *
-     * @param mixed[] $variables
-     *
-     * @return Dbgr
+     * @throws \Exception
      */
-    public static function dump(...$variables): self
+    private static function printDidYouKnow(): void
     {
-        self::defaultOptions();
-        $backtrace = debug_backtrace();
-        $params = self::getParams($backtrace);
-
-        self::debugProccess($variables, $backtrace, $params);
-
-        return self::getInstance();
-    }
-
-    /**
-     * @param bool $set
-     *
-     * @return Dbgr
-     */
-    public static function noAjax(bool $set = true): self
-    {
-        return self::forceHtml($set);
-    }
-
-    /**
-     * Sets where setFile will write output
-     *
-     * @param string $logDir
-     *
-     * @return Dbgr
-     */
-    public static function setLogDir(string $logDir): self
-    {
-        self::$logDir = rtrim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-        FileSystem::createDir(self::$logDir);
-
-        return self::getInstance();
-    }
-
-    /**
-     * Dump only if previously set condition is true. Use method condition to set up condition
-     *
-     * @param string $conditionName
-     * @param mixed[] $args
-     *
-     * @return Dbgr
-     */
-    public static function dumpConditional(string $conditionName, ...$args): self
-    {
-        if (isset(self::$condition[$conditionName]) && self::$condition[$conditionName]) {
-            self::defaultOptions();
-            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
-
-            self::debugProccess($args, $backtrace, $params);
+        if (! self::$stylesPrinted) {
+            $count = count(self::$config['didYouKnow']);
+            $index = random_int(0, $count - 1);
+            self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b>');
         }
-
-        return self::getInstance();
-    }
-
-    /**
-     * Dumps only if first parameter is true. Use condition() and dumpConditional() for better versatility
-     *
-     * @param bool $condition
-     * @param mixed[] ...$args
-     *
-     * @return Dbgr
-     */
-    public static function dumpOnTrue(bool $condition, ...$args): self
-    {
-        if ($condition === true) {
-            self::defaultOptions();
-            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
-
-            self::debugProccess($args, $backtrace, $params);
-        }
-
-        return self::getInstance();
-    }
-
-    /**
-     * alias of condition
-     *
-     * @param string $conditionName
-     * @param bool $value
-     *
-     * @return Dbgr
-     */
-    public static function setCondition(string $conditionName, bool $value): self
-    {
-        return self::condition($conditionName, $value);
-    }
-
-    /**
-     * Set condition to control dumpConditional calls
-     *
-     * @param string $conditionName
-     * @param bool $value
-     *
-     * @return Dbgr
-     */
-    public static function condition(string $conditionName, bool $value): self
-    {
-        self::$condition[$conditionName] = $value;
-
-        return self::getInstance();
-    }
-
-    /**
-     * Set new counter. Use before incrementCounter
-     *
-     * @param string $name Name of the counter
-     * @param int|mixed[]|Countable $count Total count
-     *
-     * @return Dbgr
-     * @throws RuntimeException
-     */
-    public static function setCounter(string $name, $count): self
-    {
-        if ($count instanceof Countable || \is_array($count)) {
-            $count = count($count);
-        }
-
-        if (!\is_int($count)) {
-            throw new RuntimeException('Argument is not countable');
-        }
-
-        self::$counter[$name] = 0;
-        self::$counterTotal[$name] = $count;
-
-        return self::getInstance();
-    }
-
-    /**
-     * Increments counter. Use after counter is set using setCounter
-     *
-     * @param string $name Counter to increment
-     * @param int $printAfter After how many increments should be counter printed? (0 = never)
-     *
-     * @return Dbgr
-     */
-    public static function incrementCounter(string $name, int $printAfter = 1): self
-    {
-        $count = self::$counter[$name]++;
-        if ($printAfter && $count % $printAfter === 0) {
-            self::echo($count . '/' . self::$counterTotal[$name] . ' (' . $name . ')');
-        }
-
-        return self::getInstance();
-    }
-
-    /**
-     * @param bool $forceDevelopmentMode
-     *
-     * @return Dbgr
-     */
-    public static function forceDevelopmentMode(bool $forceDevelopmentMode = true): Dbgr
-    {
-        self::$forceDevelopmentMode = $forceDevelopmentMode;
-
-        return self::getInstance();
     }
 }

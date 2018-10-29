@@ -22,7 +22,7 @@
     "php": ">= 7.2",
     "tracy/tracy": "^2.5",
     "ext-json": "*",
-    "nette/utils": "^2.5",
+    "nette/utils": "^2.5"
   },
   "license": "MIT",
   "require-dev": {

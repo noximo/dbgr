@@ -1,14 +1,15 @@
 {
   "logDir": "../../log/",
   "adminerDatabaseName": null,
+  "adminerUsername": null,
   "adminerUrlLink": "http://localhost/adminer.php",
   "allowedIPAddresses": [],
   "editorUri": "editor://%action/?file=%file&line=%line&search=%search&replace=%replace",
   "didYouKnow": [
-    "You can use *dumpOnTrue* method to print variables only when first parameter is true.",
-    "Dbgr respects *__debugInfo* magic method. You can use it to adjust what data object prints out.",
-    "You can use method *condition* to set wheter condition is true or false and then use dumpConditional only when condition is true.",
-    "You can set your own config file by creating dbgr.json in root folder or using *loadConfig* method dynamicaly",
+    "You can use <b>dumpOnTrue</b> method to print variables only when first parameter is true.",
+    "Dbgr respects <a href='https://secure.php.net/manual/en/language.oop5.magic.php#object.debuginfo'>__debugInfo</a> magic method. You can use it to adjust what data object prints out.",
+    "You can use method <b>condition</b> to set wheter condition is true or false and then use dumpConditional only when condition is true.",
+    "You can set your own config file by creating dbgr.json in root folder or using <b>loadConfig</b> method dynamicaly",
     "Dbgr can open files on line where Dbgr was called, backtrace locations and even class declarations with single click. To set it up, follow guide at https://tracy.nette.org/en/open-files-in-ide",
     "Colored lines at the left side are based on backtraces. Same dump, reached through different stack traces will have different colors to quickly tell them apart",
     "You name your dumped data using <b>setName</b> method",
@@ -22,6 +23,9 @@
     "If you're annoyed by hidden and forgotten exits and dies, you can use <b>dieNow</b> method to end script with proper and verbose message",
     "You can use <b>dieAfter</b> method if you want to end script execution prematurely but not immediatly. No need to iterate over 20 000 items if 20 is enough.",
     "If you have too many dumps in your output, you can differentiate them by colors using <b>setColor</b> method",
-    "If you're working with imports or other large sets of data, you can use methods <b>setCounter</b> and <b>incrementCounter</b> to quickly view progress. It will print only every Xth iteration."
+    "If you're working with imports or other large sets of data, you can use methods <b>setCounter</b> and <b>incrementCounter</b> to quickly view progress. It will print only every Xth iteration.",
+    "Hold ctrl and click on class name - it will bring you to its declaration.",
+    "Hold ctrl and double click on top line with filename - it will open full call stack and additional info.",
+    "Hold ctrl and double click on outputed data - it will enlarge output."
   ]
 }
