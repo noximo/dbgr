@@ -134,12 +134,16 @@ class Dbgr
     /** @var bool */
     private static $initialized = false;
 
+    /** @var string */
+    private static $rootDir;
+
     /**
      * Dbgr constructor.
      * @throws JsonException
      */
     public function __construct()
     {
+
         self::loadDefaultConfig();
     }
 
@@ -152,10 +156,12 @@ class Dbgr
         if (self::$initialized) {
             return;
         }
+        self::$rootDir = \dirname(__DIR__, 4) . DIRECTORY_SEPARATOR;
+
         $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
         self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
 
-        $localFile = \dirname(__FILE__, 3) . DIRECTORY_SEPARATOR . 'dbgr.json';
+        $localFile = self::$rootDir . DIRECTORY_SEPARATOR . 'dbgr.json';
         $customConfig = [];
         if (file_exists($localFile)) {
             $content = FileSystem::read($localFile);
@@ -217,7 +223,6 @@ class Dbgr
 
     /**
      * Set name for debug
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -232,7 +237,6 @@ class Dbgr
 
     /**
      * Nastaví do jaké hloubky se mají vypsat proměnné
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -293,7 +297,6 @@ class Dbgr
 
     /**
      * Should dumped data always print out formatted as HTML?
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -307,7 +310,6 @@ class Dbgr
 
     /**
      * End script execution instantly and loudly.
-     *
      * @throws JsonException
      */
     public static function dieNow(bool $force = false): void
@@ -338,7 +340,6 @@ class Dbgr
 
     /**
      * Nastaví barvu výpisu
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -388,6 +389,7 @@ class Dbgr
      * Stop script execution after $count calls. Can output variable
      *
      * @param mixed $variable
+     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -439,7 +441,6 @@ class Dbgr
 
     /**
      * Sets where setFile will write output
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -501,7 +502,6 @@ class Dbgr
 
     /**
      * alias of condition
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -514,7 +514,6 @@ class Dbgr
 
     /**
      * Set condition to control dumpConditional calls
-     *
      * @return Dbgr
      * @throws JsonException
      */
@@ -544,7 +543,7 @@ class Dbgr
             $count = count($count);
         }
 
-        if (! \is_int($count)) {
+        if (!\is_int($count)) {
             throw new RuntimeException('Argument is not countable');
         }
 
@@ -631,7 +630,7 @@ class Dbgr
         self::debugStart(self::getHash($args, $backtrace, $params));
 
         self::firstBacktrace($backtrace);
-        if (! self::$isAjax && ! self::$isConsole) {
+        if (!self::$isAjax && !self::$isConsole) {
             self::restOftheBacktraces($backtrace);
         }
 
@@ -653,7 +652,7 @@ class Dbgr
     private static function debugStart(string $hash): void
     {
         if (self::$forceHTML === false &&
-            ! empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             self::$isAjax = true;
         }
@@ -663,7 +662,7 @@ class Dbgr
         }
 
         $color = self::$even ? 'lightyellow' : 'rgb(255, 255, 187)';
-        self::$even = ! self::$even;
+        self::$even = !self::$even;
 
         $borderColor = self::colorize();
 
@@ -825,16 +824,16 @@ class Dbgr
             self::addToOutput('</div>');
         }
 
-        if (! empty($_GET)) {
+        if (!empty($_GET)) {
             self::printVariables([$_GET], ['GET']);
         }
-        if (! empty($_POST)) {
+        if (!empty($_POST)) {
             self::printVariables([$_POST], ['POST']);
         }
-        if (! empty($_SERVER)) {
+        if (!empty($_SERVER)) {
             self::printVariables([$_SERVER], ['SERVER']);
         }
-        if (! empty($_SESSION)) {
+        if (!empty($_SESSION)) {
             self::printVariables([$_SESSION], ['SESSION']);
         }
 
@@ -852,7 +851,7 @@ class Dbgr
     private static function printVariables(array $variables, array $params): void
     {
         foreach ($variables as $key => $variable) {
-            if ((self::$isAjax || self::$isConsole) && ! self::$file) {
+            if ((self::$isAjax || self::$isConsole) && !self::$file) {
                 self::addToOutput('---');
             }
             self::addToOutput("<div><strong class='debug-variable-name'>" . $params[$key] . ':</strong>');
@@ -883,7 +882,7 @@ class Dbgr
 
         $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         preg_match($patter, strtoupper($sql), $matches);
-        if (! empty($matches)) {
+        if (!empty($matches)) {
             return true;
         }
 
@@ -908,22 +907,22 @@ class Dbgr
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         $sql = (string) preg_replace_callback($pattern, function ($matches) use ($break) {
-            if (! empty($matches[1])) {
+            if (!empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
             }
 
-            if (! empty($matches[2])) {
+            if (!empty($matches[2])) {
                 // error
                 return '<strong style="color:red">' . $matches[2] . '</strong>';
             }
 
-            if (! empty($matches[3])) {
+            if (!empty($matches[3])) {
                 // most important keywords
                 return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
             }
 
-            if (! empty($matches[4])) {
+            if (!empty($matches[4])) {
                 // other keywords
                 return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
             }
@@ -965,7 +964,7 @@ class Dbgr
             $options[Dumper::TRUNCATE] = false;
         }
 
-        if (PHP_SAPI !== 'cli' && ! preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
+        if (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
             $string = Dumper::toHtml($variable, $options);
         } elseif (self::detectColors()) {
             $string = Dumper::toTerminal($variable, $options);
@@ -1025,8 +1024,8 @@ class Dbgr
     {
         self::$allOutputs[] = self::$output;
 
-        if (! self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
-            if (! self::$stylesPrinted && ! self::$isAjax) {
+        if (!self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
+            if (!self::$stylesPrinted && !self::$isAjax) {
                 self::printStyles();
             }
             if (self::$isAjax) {
@@ -1034,8 +1033,8 @@ class Dbgr
             } else {
                 self::echo(self::$output, false);
             }
-        } elseif (! empty(self::$file) && ! empty(self::$logDir)) {
-            if (! isset(self::$fileOutputs[self::$file])) {
+        } elseif (!empty(self::$file) && !empty(self::$logDir)) {
+            if (!isset(self::$fileOutputs[self::$file])) {
                 self::$fileOutputs[self::$file] = '';
             }
             self::$fileOutputs[self::$file] .= self::$output;
@@ -1059,13 +1058,13 @@ class Dbgr
         $styles = '';
         $path = __DIR__ . DIRECTORY_SEPARATOR;
         $styles .= '<style>';
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.css');
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.css');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.css');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.css');
         $styles .= FileSystem::read($path . 'dumper.css');
         $styles .= '</style>';
         $styles .= '<script>';
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.js');
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.js');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.js');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.js');
         $styles .= FileSystem::read($path . 'dumper.js');
         $styles .= '</script>';
 
@@ -1124,10 +1123,15 @@ class Dbgr
      */
     private static function printDidYouKnow(): void
     {
-        if (! self::$stylesPrinted) {
+        if (!self::$stylesPrinted) {
             $count = count(self::$config['didYouKnow']);
             $index = random_int(0, $count - 1);
             self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b>');
         }
+    }
+
+    public function __toString()
+    {
+        return '';
     }
 }
