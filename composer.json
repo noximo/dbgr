@@ -30,12 +30,12 @@
     "symplify/easy-coding-standard": "^5.1"
   },
   "scripts": {
-    "complete-check": [
+    "check": [
       "@check-cs",
       "@phpstan"
     ],
-    "check-cs": "vendor/bin/ecs check src",
-    "fix-cs": "vendor/bin/ecs check src --fix",
-    "phpstan": "vendor/bin/phpstan analyse src --level max"
+    "check-cs": "ecs check src",
+    "fix-cs": "ecs check src --fix",
+    "phpstan": "phpstan analyse src --level max"
   }
 }

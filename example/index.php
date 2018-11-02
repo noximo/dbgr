@@ -6,6 +6,8 @@ use noximo\Dbgr;
 
 include dirname(__DIR__) . '/vendor/autoload.php';
 
+
+
 class Test
 {
     public $name;
@@ -74,6 +76,10 @@ try {
         'adminerUsername' => 'develop',
 
     ]);
+    Dbgr::dump($debugger, $sql, $object, $class, $classDebugInfo);
+    Dbgr::dump($debugger, $sql, $object, $class, $classDebugInfo);
+    Dbgr::dump($debugger, $sql, $object, $class, $classDebugInfo);
+    Dbgr::dump($debugger, $sql, $object, $class, $classDebugInfo);
     Dbgr::dump($debugger, $sql, $object, $class, $classDebugInfo);
 } catch (Throwable $e) {
     echo $e->getMessage();

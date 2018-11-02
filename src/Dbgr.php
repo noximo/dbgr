@@ -6,11 +6,9 @@ namespace noximo;
 
 use Countable;
 use Nette\FileNotFoundException;
-use Nette\IOException;
 use Nette\Utils\DateTime;
 use Nette\Utils\FileSystem;
 use Nette\Utils\Json;
-use Nette\Utils\JsonException;
 use RuntimeException;
 use Throwable;
 use Tracy\Debugger;
@@ -136,30 +134,33 @@ class Dbgr
 
     /**
      * Dbgr constructor.
-     * @throws JsonException
      */
     public function __construct()
     {
         self::loadDefaultConfig();
     }
 
-    /**
-     * @throws JsonException
-     * @throws IOException
-     */
     public static function loadDefaultConfig(): void
     {
         if (self::$initialized) {
             return;
         }
-        $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
-        self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
+        try {
+            $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
+            self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
+        } catch (Throwable $e) {
+            self::echo("Default config couldn't be inicialized: " . $e->getMessage());
+        }
 
         $localFile = \dirname(__FILE__, 3) . DIRECTORY_SEPARATOR . 'dbgr.json';
         $customConfig = [];
         if (file_exists($localFile)) {
-            $content = FileSystem::read($localFile);
-            $customConfig = Json::decode($content, Json::FORCE_ARRAY);
+            try {
+                $content = FileSystem::read($localFile);
+                $customConfig = Json::decode($content, Json::FORCE_ARRAY);
+            } catch (Throwable $e) {
+                self::echo("Local config couldn't be inicialized: " . $e->getMessage());
+            }
         }
 
         self::setConfigData($customConfig);
@@ -167,10 +168,11 @@ class Dbgr
     }
 
     /**
+     * Instantly prints out message
+     *
      * @param mixed[] $customConfig
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setConfig(array $customConfig): self
     {
@@ -183,7 +185,6 @@ class Dbgr
 
     /**
      * @return Dbgr
-     * @throws JsonException
      */
     public static function getInstance(): self
     {
@@ -196,16 +197,20 @@ class Dbgr
 
     /**
      * @return Dbgr
-     * @throws JsonException
-     * @throws IOException
+     * @throws FileNotFoundException
      */
     public static function loadConfig(string $filefilename): self
     {
         self::loadDefaultConfig();
 
         if (file_exists($filefilename)) {
-            $content = FileSystem::read($filefilename);
-            $customConfig = Json::decode($content, Json::FORCE_ARRAY);
+            $customConfig = [];
+            try {
+                $content = FileSystem::read($filefilename);
+                $customConfig = Json::decode($content, Json::FORCE_ARRAY);
+            } catch (Throwable $e) {
+                self::echo("Config couldn't be inicialized: " . $e->getMessage());
+            }
 
             self::setConfigData($customConfig);
 
@@ -217,9 +222,7 @@ class Dbgr
 
     /**
      * Set name for debug
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setName(string $name): self
     {
@@ -232,9 +235,7 @@ class Dbgr
 
     /**
      * Nastaví do jaké hloubky se mají vypsat proměnné
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setDepth(int $depth): self
     {
@@ -248,7 +249,6 @@ class Dbgr
 
     /**
      * Nastaví výchozí nastavení
-     * @throws JsonException
      */
     public static function defaultOptions(bool $reset = false): void
     {
@@ -273,7 +273,6 @@ class Dbgr
      * @param string|null $filename
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setFile(?string $filename = null): self
     {
@@ -293,9 +292,7 @@ class Dbgr
 
     /**
      * Should dumped data always print out formatted as HTML?
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function forceHtml(bool $set = true): self
     {
@@ -307,8 +304,6 @@ class Dbgr
 
     /**
      * End script execution instantly and loudly.
-     *
-     * @throws JsonException
      */
     public static function dieNow(bool $force = false): void
     {
@@ -324,9 +319,6 @@ class Dbgr
         }
     }
 
-    /**
-     * @throws JsonException
-     */
     public static function canBeOutputed(): bool
     {
         self::loadDefaultConfig();
@@ -338,9 +330,7 @@ class Dbgr
 
     /**
      * Nastaví barvu výpisu
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setColor(string $color): self
     {
@@ -356,7 +346,6 @@ class Dbgr
      * @param bool $bold Should message be bolder?
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
     {
@@ -388,8 +377,8 @@ class Dbgr
      * Stop script execution after $count calls. Can output variable
      *
      * @param mixed $variable
+     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function dieAfter(int $count, bool $force = false, $variable = 'not_set'): self
     {
@@ -422,7 +411,6 @@ class Dbgr
      * @param mixed ...$variables
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function dump(...$variables): self
     {
@@ -439,9 +427,7 @@ class Dbgr
 
     /**
      * Sets where setFile will write output
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setLogDir(string $logDir): self
     {
@@ -459,7 +445,6 @@ class Dbgr
      * @param mixed ...$args
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function dumpConditional(string $conditionName, ...$args): self
     {
@@ -482,7 +467,6 @@ class Dbgr
      * @param mixed ...$args
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function dumpOnTrue(bool $condition, ...$args): self
     {
@@ -501,9 +485,7 @@ class Dbgr
 
     /**
      * alias of condition
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setCondition(string $conditionName, bool $value): self
     {
@@ -514,9 +496,7 @@ class Dbgr
 
     /**
      * Set condition to control dumpConditional calls
-     *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function condition(string $conditionName, bool $value): self
     {
@@ -534,7 +514,6 @@ class Dbgr
      * @param int|mixed[]|Countable $count Total count
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function setCounter(string $name, $count): self
     {
@@ -544,7 +523,7 @@ class Dbgr
             $count = count($count);
         }
 
-        if (! \is_int($count)) {
+        if (!\is_int($count)) {
             throw new RuntimeException('Argument is not countable');
         }
 
@@ -561,7 +540,6 @@ class Dbgr
      * @param int $printAfter After how many increments should be counter printed? (0 = never)
      *
      * @return Dbgr
-     * @throws JsonException
      */
     public static function incrementCounter(string $name, int $printAfter = 1): self
     {
@@ -577,7 +555,6 @@ class Dbgr
 
     /**
      * @return Dbgr
-     * @throws JsonException
      */
     public static function forceDevelopmentMode(bool $forceDevelopmentMode = true): self
     {
@@ -621,9 +598,6 @@ class Dbgr
      * @param mixed[] $args
      * @param mixed[] $backtrace
      * @param string[] $params
-     *
-     * @throws JsonException
-     * @throws \Exception
      */
     private static function debugProccess(array $args, array $backtrace, array $params): void
     {
@@ -631,7 +605,7 @@ class Dbgr
         self::debugStart(self::getHash($args, $backtrace, $params));
 
         self::firstBacktrace($backtrace);
-        if (! self::$isAjax && ! self::$isConsole) {
+        if ((!self::$isAjax && !self::$isConsole) || self::$forceHTML === true) {
             self::restOftheBacktraces($backtrace);
         }
 
@@ -647,13 +621,10 @@ class Dbgr
         self::$output = '';
     }
 
-    /**
-     * @throws JsonException
-     */
     private static function debugStart(string $hash): void
     {
         if (self::$forceHTML === false &&
-            ! empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             self::$isAjax = true;
         }
@@ -663,7 +634,7 @@ class Dbgr
         }
 
         $color = self::$even ? 'lightyellow' : 'rgb(255, 255, 187)';
-        self::$even = ! self::$even;
+        self::$even = !self::$even;
 
         $borderColor = self::colorize();
 
@@ -700,7 +671,7 @@ class Dbgr
             $color = 'style = "background-color:' . self::$color . ';"';
             self::$color = null;
         }
-        self::addToOutput('<div ondblclick="debugToggle(this, event);" class="debug-backtrace debug-backtrace-first" title="Hold ctrl and doubleclick to show more info" ' . $color . '>');
+        self::addToOutput('<div onclick="debugToggle(this, event);" class="debug-backtrace debug-backtrace-first" title="Hold CTRL and double-click or triple-click to show more info" ' . $color . '>');
         if (self::$name) {
             self::addToOutput("<div class='debug-inline-name'>" . self::$name . '</div>');
             self::$name = null;
@@ -808,8 +779,6 @@ class Dbgr
 
     /**
      * @param mixed[] $backtrace
-     *
-     * @throws JsonException
      */
     private static function restOftheBacktraces(array $backtrace): void
     {
@@ -825,20 +794,21 @@ class Dbgr
             self::addToOutput('</div>');
         }
 
-        if (! empty($_GET)) {
+        if (!empty($_GET)) {
             self::printVariables([$_GET], ['GET']);
         }
-        if (! empty($_POST)) {
+        if (!empty($_POST)) {
             self::printVariables([$_POST], ['POST']);
         }
-        if (! empty($_SERVER)) {
+        if (!empty($_SERVER)) {
             self::printVariables([$_SERVER], ['SERVER']);
         }
-        if (! empty($_SESSION)) {
+        if (!empty($_SESSION)) {
             self::printVariables([$_SESSION], ['SESSION']);
         }
 
         self::printVariables([PHP_VERSION], ['PHP Version']);
+        self::printVariables([self::$config], ['Current configuration']);
 
         self::addToOutput('</div>');
     }
@@ -846,17 +816,15 @@ class Dbgr
     /**
      * @param mixed[] $variables
      * @param mixed[] $params
-     *
-     * @throws JsonException
      */
     private static function printVariables(array $variables, array $params): void
     {
         foreach ($variables as $key => $variable) {
-            if ((self::$isAjax || self::$isConsole) && ! self::$file) {
+            if ((self::$isAjax || self::$isConsole) && !self::$file) {
                 self::addToOutput('---');
             }
             self::addToOutput("<div><strong class='debug-variable-name'>" . $params[$key] . ':</strong>');
-            self::addToOutput("<div ondblclick='debugExpand(this, event);' class='debug-variable'>");
+            self::addToOutput("<div onclick='debugExpand(this, event);' class='debug-variable' title='Hold CTRL and double-click or triple-click to enlarge/shrink this dump'>");
 
             if (\is_string($variable) && self::isSQL($variable)) {
                 self::addToOutput("<div class='debug-sql'>");
@@ -883,7 +851,7 @@ class Dbgr
 
         $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         preg_match($patter, strtoupper($sql), $matches);
-        if (! empty($matches)) {
+        if (!empty($matches)) {
             return true;
         }
 
@@ -908,22 +876,22 @@ class Dbgr
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         $sql = (string) preg_replace_callback($pattern, function ($matches) use ($break) {
-            if (! empty($matches[1])) {
+            if (!empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
             }
 
-            if (! empty($matches[2])) {
+            if (!empty($matches[2])) {
                 // error
                 return '<strong style="color:red">' . $matches[2] . '</strong>';
             }
 
-            if (! empty($matches[3])) {
+            if (!empty($matches[3])) {
                 // most important keywords
                 return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
             }
 
-            if (! empty($matches[4])) {
+            if (!empty($matches[4])) {
                 // other keywords
                 return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
             }
@@ -935,9 +903,6 @@ class Dbgr
         return "<span class='dump'>${sql}</span>";
     }
 
-    /**
-     * @throws JsonException
-     */
     private static function sqlLink(string $sql): string
     {
         $return = '';
@@ -947,7 +912,7 @@ class Dbgr
                 'db' => self::$adminerDatabaseName,
                 'sql' => trim((string) preg_replace('/[ \t]+/', ' ', $sql)),
             ];
-            $return = '<a class="debug-sql-link" target="_blank" href="' . self::$adminerUrlLink . '?' . http_build_query($query) . '">Otevřít v admineru</a>';
+            $return = '<a class="debug-sql-link" target="_blank" href="' . self::$adminerUrlLink . '?' . http_build_query($query) . '">Open using adminer</a>';
         }
 
         return $return;
@@ -965,7 +930,7 @@ class Dbgr
             $options[Dumper::TRUNCATE] = false;
         }
 
-        if (PHP_SAPI !== 'cli' && ! preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()))) {
+        if (self::$forceHTML === true || (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list())))) {
             $string = Dumper::toHtml($variable, $options);
         } elseif (self::detectColors()) {
             $string = Dumper::toTerminal($variable, $options);
@@ -1009,24 +974,18 @@ class Dbgr
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
 
-    /**
-     * @throws JsonException
-     */
     private static function debugEnd(): void
     {
         self::defaultOptions(true);
         self::addToOutput('</div>');
     }
 
-    /**
-     * @throws JsonException
-     */
     private static function printOutput(): void
     {
         self::$allOutputs[] = self::$output;
 
-        if (! self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
-            if (! self::$stylesPrinted && ! self::$isAjax) {
+        if (!self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
+            if (!self::$stylesPrinted && (!self::$isAjax || self::$forceHTML === true)) {
                 self::printStyles();
             }
             if (self::$isAjax) {
@@ -1034,8 +993,8 @@ class Dbgr
             } else {
                 self::echo(self::$output, false);
             }
-        } elseif (! empty(self::$file) && ! empty(self::$logDir)) {
-            if (! isset(self::$fileOutputs[self::$file])) {
+        } elseif (!empty(self::$file) && !empty(self::$logDir)) {
+            if (!isset(self::$fileOutputs[self::$file])) {
                 self::$fileOutputs[self::$file] = '';
             }
             self::$fileOutputs[self::$file] .= self::$output;
@@ -1044,7 +1003,7 @@ class Dbgr
             self::$file = null;
         } elseif (self::$isConsole) {
             $str = PHP_EOL . '..................................' . PHP_EOL;
-            self::echo(PHP_EOL . $str . self::ajaxOutput() . $str . PHP_EOL);
+            self::echo(PHP_EOL . $str . self::ajaxOutput() . $str . PHP_EOL, false);
         }
     }
 
@@ -1119,15 +1078,16 @@ class Dbgr
         }
     }
 
-    /**
-     * @throws \Exception
-     */
     private static function printDidYouKnow(): void
     {
-        if (! self::$stylesPrinted) {
+        if (!self::$stylesPrinted) {
             $count = count(self::$config['didYouKnow']);
-            $index = random_int(0, $count - 1);
-            self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b>');
+            try {
+                $index = random_int(0, $count - 1);
+            } catch (\Throwable $e) {
+                $index = substr((string) time(), -1, 1); //Eh, random enough, shouldn't happen anyway
+            }
+            self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b></div>');
         }
     }
 }
