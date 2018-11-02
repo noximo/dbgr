@@ -132,11 +132,15 @@ class Dbgr
     /** @var bool */
     private static $initialized = false;
 
+    /** @var string */
+    private static $rootDir;
+
     /**
      * Dbgr constructor.
      */
     public function __construct()
     {
+
         self::loadDefaultConfig();
     }
 
@@ -145,6 +149,7 @@ class Dbgr
         if (self::$initialized) {
             return;
         }
+        self::$rootDir = realpath(\dirname(__DIR__, 4) . DIRECTORY_SEPARATOR);
         try {
             $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
             self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
@@ -152,7 +157,7 @@ class Dbgr
             self::echo("Default config couldn't be inicialized: " . $e->getMessage());
         }
 
-        $localFile = \dirname(__FILE__, 3) . DIRECTORY_SEPARATOR . 'dbgr.json';
+        $localFile = self::$rootDir . DIRECTORY_SEPARATOR . 'dbgr.json';
         $customConfig = [];
         if (file_exists($localFile)) {
             try {
@@ -1018,13 +1023,13 @@ class Dbgr
         $styles = '';
         $path = __DIR__ . DIRECTORY_SEPARATOR;
         $styles .= '<style>';
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.css');
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.css');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.css');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.css');
         $styles .= FileSystem::read($path . 'dumper.css');
         $styles .= '</style>';
         $styles .= '<script>';
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.js');
-        $styles .= FileSystem::read(\dirname(__DIR__) . DIRECTORY_SEPARATOR . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.js');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.js');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.js');
         $styles .= FileSystem::read($path . 'dumper.js');
         $styles .= '</script>';
 
@@ -1089,5 +1094,10 @@ class Dbgr
             }
             self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b></div>');
         }
+    }
+
+    public function __toString()
+    {
+        return '';
     }
 }
