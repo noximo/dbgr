@@ -140,7 +140,6 @@ class Dbgr
      */
     public function __construct()
     {
-
         self::loadDefaultConfig();
     }
 
@@ -317,8 +316,7 @@ class Dbgr
         if ($force || self::canBeOutputed()) {
             self::setColor('red');
             $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
-            self::debugProccess(['SCRIPT FORCEFULLY ENDED'], $backtrace, $params);
+            self::debugProccess(['SCRIPT FORCEFULLY ENDED'], $backtrace);
 
             die();
         }
@@ -423,9 +421,8 @@ class Dbgr
         self::defaultOptions();
 
         $backtrace = debug_backtrace();
-        $params = self::getParams($backtrace);
 
-        self::debugProccess($variables, $backtrace, $params);
+        self::debugProccess($variables, $backtrace);
 
         return self::getInstance();
     }
@@ -458,9 +455,7 @@ class Dbgr
         if (isset(self::$condition[$conditionName]) && self::$condition[$conditionName]) {
             self::defaultOptions();
             $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
-
-            self::debugProccess($args, $backtrace, $params);
+            self::debugProccess($args, $backtrace);
         }
 
         return self::getInstance();
@@ -480,9 +475,8 @@ class Dbgr
         if ($condition === true) {
             self::defaultOptions();
             $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
 
-            self::debugProccess($args, $backtrace, $params);
+            self::debugProccess($args, $backtrace);
         }
 
         return self::getInstance();
@@ -600,13 +594,18 @@ class Dbgr
     }
 
     /**
+     * @internal Call dump instead
+     *
      * @param mixed[] $args
      * @param mixed[] $backtrace
      * @param string[] $params
      */
-    private static function debugProccess(array $args, array $backtrace, array $params): void
+    public static function debugProccess(array $args, array $backtrace, array $params = null): void
     {
         self::clearOutput();
+        if ($params === null) {
+            $params = self::getParams($backtrace);
+        }
         self::debugStart(self::getHash($args, $backtrace, $params));
 
         self::firstBacktrace($backtrace);
@@ -1100,4 +1099,16 @@ class Dbgr
     {
         return '';
     }
+}
+
+function dbgr(...$variables)
+{
+    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+
+    Dbgr::loadDefaultConfig();
+    Dbgr::defaultOptions();
+
+    Dbgr::debugProccess($variables, $backtrace);
+
+    return Dbgr::getInstance();
 }
