@@ -148,7 +148,7 @@ class Dbgr
         if (self::$initialized) {
             return;
         }
-        self::$rootDir = realpath(\dirname(__DIR__, 4) . DIRECTORY_SEPARATOR);
+        self::$rootDir = realpath(\dirname(__DIR__, 4) . DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         try {
             $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
             self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
