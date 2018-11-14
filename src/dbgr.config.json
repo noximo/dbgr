@@ -1,5 +1,5 @@
 {
-  "logDir": "../../log/",
+  "logDir": "log/",
   "adminerDatabaseName": null,
   "adminerUsername": null,
   "adminerUrlLink": "http://localhost/adminer.php",

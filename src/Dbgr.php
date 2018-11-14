@@ -421,8 +421,11 @@ class Dbgr
         self::defaultOptions();
 
         $backtrace = debug_backtrace();
-
-        self::debugProccess($variables, $backtrace);
+        if (empty($variables)) {
+            $variables = [$backtrace];
+            $params = ['backtrace'];
+        }
+        self::debugProccess($variables, $backtrace, $params);
 
         return self::getInstance();
     }
@@ -435,10 +438,22 @@ class Dbgr
     {
         self::loadDefaultConfig();
 
-        self::$logDir = rtrim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-        FileSystem::createDir(self::$logDir);
+        self::setProperLogDir($logDir);
 
         return self::getInstance();
+    }
+
+    public static function setProperLogDir(string $logDir)
+    {
+        $logDir = str_replace(["/", "\\"], DIRECTORY_SEPARATOR, $logDir);
+        if (FileSystem::isAbsolute($logDir)) {
+            $path = $logDir;
+        } else {
+            $path = self::$rootDir . trim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        }
+
+        self::$logDir = $path;
+        FileSystem::createDir(self::$logDir);
     }
 
     /**
@@ -1067,7 +1082,7 @@ class Dbgr
     {
         self::$config = array_replace_recursive(self::$config, $customConfig);
 
-        self::$logDir = self::$config['logDir'] . DIRECTORY_SEPARATOR;
+        self::setProperLogDir(self::$config['logDir']);
         self::$allowedIPAddresses = self::$config['allowedIPAddresses'] ?? null;
         self::$adminerUrlLink = self::$config['adminerUrlLink'] ?? null;
         self::$adminerDatabaseName = self::$config['adminerDatabaseName'] ?? null;
