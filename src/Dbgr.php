@@ -990,6 +990,7 @@ class Dbgr
     private static function isBacktrace($variable): bool
     {
         return \is_array($variable) &&
+            \is_array($variable[0]) &&
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
 
