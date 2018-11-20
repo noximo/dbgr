@@ -421,6 +421,7 @@ class Dbgr
         self::defaultOptions();
 
         $backtrace = debug_backtrace();
+        $params = null;
         if (empty($variables)) {
             $variables = [$backtrace];
             $params = ['backtrace'];
@@ -990,6 +991,7 @@ class Dbgr
     private static function isBacktrace($variable): bool
     {
         return \is_array($variable) &&
+            isset($variable[0]) &&
             \is_array($variable[0]) &&
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
