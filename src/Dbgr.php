@@ -588,7 +588,7 @@ class Dbgr
     private static function getParams(array $backtrace): array
     {
         $file = file($backtrace[0]['file']);
-        $line = trim((string) $file[$backtrace[0]['line'] - 1]);
+        $line = trim((string)$file[$backtrace[0]['line'] - 1]);
 
         $start = strpos($line, 'dump(') + 5;
 
@@ -606,7 +606,7 @@ class Dbgr
      */
     private static function getHash(array $args, array $backtrace, array $params): string
     {
-        return md5(base64_encode((string) json_encode([$args, $backtrace, $params])));
+        return md5(base64_encode((string)json_encode([$args, $backtrace, $params])));
     }
 
     /**
@@ -675,8 +675,9 @@ class Dbgr
     /**
      * @param string|null $endofline
      */
-    private static function addToOutput(string $output, string $endofline = PHP_EOL): void
+    private static function addToOutput(string $output, string $endofline = null): void
     {
+        $endofline = $endofline ?? PHP_EOL;
         self::$output .= $output . $endofline;
     }
 
@@ -734,11 +735,11 @@ class Dbgr
 
         if ($first) {
             $nowMicro = microtime(true);
-            $now = DateTime::createFromFormat('U.u', (string) $nowMicro);
+            $now = DateTime::createFromFormat('U.u', (string)$nowMicro);
 
             if (self::$firstTimer) {
-                $difference = str_pad((string) round($nowMicro - self::$firstTimer, 3), 5, '0');
-                $lastDifference = str_pad((string) round($nowMicro - self::$lastTimer, 3), 5, '0');
+                $difference = str_pad((string)round($nowMicro - self::$firstTimer, 3), 5, '0');
+                $lastDifference = str_pad((string)round($nowMicro - self::$lastTimer, 3), 5, '0');
                 if ($now instanceof DateTime) {
                     $line .= "<span class='debug-hide' title='" . $now->format('Y-m-d H:i:s:u') . "'>" . $difference . ' (' . $lastDifference . ')</span>';
                 }
@@ -780,7 +781,7 @@ class Dbgr
      */
     private static function getOpenInIDEBacktrace(array $backtrace): string
     {
-        $link = self::getOpenInIDELink($backtrace['file'], (int) $backtrace['line']);
+        $link = self::getOpenInIDELink($backtrace['file'], (int)$backtrace['line']);
         $line = "<a title='Otevřít v editoru' href='" . $link . "'><small>" . \dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
 
         if (isset($backtrace['line'])) {
@@ -888,14 +889,14 @@ class Dbgr
 
         // reduce spaces
         $sql = wordwrap($sql, 100);
-        $sql = (string) preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
-        $sql = (string) preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
+        $sql = (string)preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
+        $sql = (string)preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
         $sql = str_replace('            ', ' ', $sql);
 
         // syntax highlight
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
-        $sql = (string) preg_replace_callback($pattern, function ($matches) use ($break) {
+        $sql = (string)preg_replace_callback($pattern, function ($matches) use ($break) {
             if (!empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
@@ -918,7 +919,7 @@ class Dbgr
 
             return '';
         }, $sql);
-        $sql = trim((string) preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
+        $sql = trim((string)preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
 
         return "<span class='dump'>${sql}</span>";
     }
@@ -930,7 +931,7 @@ class Dbgr
             $query = [
                 'username' => self::$adminerUsername,
                 'db' => self::$adminerDatabaseName,
-                'sql' => trim((string) preg_replace('/[ \t]+/', ' ', $sql)),
+                'sql' => trim((string)preg_replace('/[ \t]+/', ' ', $sql)),
             ];
             $return = '<a class="debug-sql-link" target="_blank" href="' . self::$adminerUrlLink . '?' . http_build_query($query) . '">Open using adminer</a>';
         }
@@ -1059,7 +1060,7 @@ class Dbgr
     private static function ajaxOutput()
     {
         if (\is_string(self::$output)) {
-            $pregReplace = (string) preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
+            $pregReplace = (string)preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
 
             return str_replace('x//', '', $pregReplace);
         }
@@ -1107,7 +1108,7 @@ class Dbgr
             try {
                 $index = random_int(0, $count - 1);
             } catch (\Throwable $e) {
-                $index = substr((string) time(), -1, 1); //Eh, random enough, shouldn't happen anyway
+                $index = substr((string)time(), -1, 1); //Eh, random enough, shouldn't happen anyway
             }
             self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b></div>');
         }
