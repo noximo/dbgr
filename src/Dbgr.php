@@ -278,7 +278,7 @@ class Dbgr
      *
      * @return Dbgr
      */
-    public static function setFile(?string $filename = null): self
+    public static function setFile(string $filename = null): self
     {
         self::loadDefaultConfig();
 
@@ -675,7 +675,7 @@ class Dbgr
     /**
      * @param string|null $endofline
      */
-    private static function addToOutput(string $output, ?string $endofline = PHP_EOL): void
+    private static function addToOutput(string $output, string $endofline = PHP_EOL): void
     {
         self::$output .= $output . $endofline;
     }
@@ -727,7 +727,7 @@ class Dbgr
      * @param mixed[] $backtrace
      * @param bool|null $first
      */
-    private static function printHeader(array $backtrace, ?bool $first = null): void
+    private static function printHeader(array $backtrace, bool $first = null): void
     {
         $first = $first ?? null;
         $line = self::printBacktrace($backtrace);
