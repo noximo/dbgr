@@ -37,10 +37,5 @@
     "check-cs": "ecs check src",
     "fix-cs": "ecs check src --fix",
     "phpstan": "phpstan analyse src --level max"
-  },
-  "extra": {
-    "branch-alias": {
-      "php70-compatibility": "0.0.1"
-    }
   }
 }
