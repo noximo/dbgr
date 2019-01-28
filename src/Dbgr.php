@@ -143,7 +143,7 @@ class Dbgr
         self::loadDefaultConfig();
     }
 
-    public static function loadDefaultConfig(): void
+    public static function loadDefaultConfig()
     {
         if (self::$initialized) {
             return;
@@ -254,7 +254,7 @@ class Dbgr
     /**
      * Nastaví výchozí nastavení
      */
-    public static function defaultOptions(bool $reset = false): void
+    public static function defaultOptions(bool $reset = false)
     {
         self::loadDefaultConfig();
 
@@ -309,7 +309,7 @@ class Dbgr
     /**
      * End script execution instantly and loudly.
      */
-    public static function dieNow(bool $force = false): void
+    public static function dieNow(bool $force = false)
     {
         self::loadDefaultConfig();
 
@@ -616,7 +616,7 @@ class Dbgr
      * @param mixed[] $backtrace
      * @param string[] $params
      */
-    public static function debugProccess(array $args, array $backtrace, array $params = null): void
+    public static function debugProccess(array $args, array $backtrace, array $params = null)
     {
         self::clearOutput();
         if ($params === null) {
@@ -636,12 +636,12 @@ class Dbgr
         self::printOutput();
     }
 
-    private static function clearOutput(): void
+    private static function clearOutput()
     {
         self::$output = '';
     }
 
-    private static function debugStart(string $hash): void
+    private static function debugStart(string $hash)
     {
         if (self::$forceHTML === false &&
             !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
@@ -675,7 +675,7 @@ class Dbgr
     /**
      * @param string|null $endofline
      */
-    private static function addToOutput(string $output, string $endofline = null): void
+    private static function addToOutput(string $output, string $endofline = null)
     {
         $endofline = $endofline ?? PHP_EOL;
         self::$output .= $output . $endofline;
@@ -684,7 +684,7 @@ class Dbgr
     /**
      * @param mixed[] $backtrace
      */
-    private static function firstBacktrace(array $backtrace): void
+    private static function firstBacktrace(array $backtrace)
     {
         $first = self::getFirstBacktrace($backtrace);
         $color = null;
@@ -728,7 +728,7 @@ class Dbgr
      * @param mixed[] $backtrace
      * @param bool|null $first
      */
-    private static function printHeader(array $backtrace, bool $first = null): void
+    private static function printHeader(array $backtrace, bool $first = null)
     {
         $first = $first ?? null;
         $line = self::printBacktrace($backtrace);
@@ -801,7 +801,7 @@ class Dbgr
     /**
      * @param mixed[] $backtrace
      */
-    private static function restOftheBacktraces(array $backtrace): void
+    private static function restOftheBacktraces(array $backtrace)
     {
         self::addToOutput('<div class="debug-backtraces" style="display:none;" >');
         /** @var int $i */
@@ -838,7 +838,7 @@ class Dbgr
      * @param mixed[] $variables
      * @param mixed[] $params
      */
-    private static function printVariables(array $variables, array $params): void
+    private static function printVariables(array $variables, array $params)
     {
         foreach ($variables as $key => $variable) {
             if ((self::$isAjax || self::$isConsole) && !self::$file) {
@@ -974,7 +974,7 @@ class Dbgr
     /**
      * @param string[][] $backtraces
      */
-    private static function printBacktraces(array $backtraces): void
+    private static function printBacktraces(array $backtraces)
     {
         self::addToOutput('<div class="debug-backtrace-as-variable">');
         foreach ($backtraces as $i => $backtrace) {
@@ -997,13 +997,13 @@ class Dbgr
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
 
-    private static function debugEnd(): void
+    private static function debugEnd()
     {
         self::defaultOptions(true);
         self::addToOutput('</div>');
     }
 
-    private static function printOutput(): void
+    private static function printOutput()
     {
         self::$allOutputs[] = self::$output;
 
@@ -1030,7 +1030,7 @@ class Dbgr
         }
     }
 
-    private static function printStyles(): void
+    private static function printStyles()
     {
         self::addToOutput(self::getStyles());
         self::$stylesPrinted = true;
@@ -1082,7 +1082,7 @@ class Dbgr
     /**
      * @param mixed[] $customConfig
      */
-    private static function setConfigData(array $customConfig): void
+    private static function setConfigData(array $customConfig)
     {
         self::$config = array_replace_recursive(self::$config, $customConfig);
 
@@ -1101,7 +1101,7 @@ class Dbgr
         }
     }
 
-    private static function printDidYouKnow(): void
+    private static function printDidYouKnow()
     {
         if (!self::$stylesPrinted) {
             $count = count(self::$config['didYouKnow']);
