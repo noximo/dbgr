@@ -1008,7 +1008,7 @@ class Dbgr
         self::$allOutputs[] = self::$output;
 
         if (!self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
-            if (!self::$stylesPrinted && (!self::$isAjax || self::$forceHTML === true)) {
+            if (!self::$stylesPrinted && (!self::$isAjax || self::$forceHTML === true || self::$file !== null)) {
                 self::printStyles();
             }
             if (self::$isAjax) {
