@@ -606,7 +606,9 @@ class Dbgr
      */
     private static function getHash(array $args, array $backtrace, array $params): string
     {
-        return md5(base64_encode((string)json_encode([$args, $backtrace, $params])));
+        $array = json_encode([$args, array_column($backtrace, 'file'), array_column($backtrace, 'line'), $params]);
+
+        return md5($array);
     }
 
     /**
