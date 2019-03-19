@@ -14,6 +14,12 @@ use Throwable;
 use Tracy\Debugger;
 use Tracy\Dumper;
 use Tracy\Helpers;
+use function defined;
+use function dirname;
+use function function_exists;
+use function is_array;
+use function is_int;
+use function is_string;
 
 /**
  * Class Dbgr
@@ -148,7 +154,7 @@ class Dbgr
         if (self::$initialized) {
             return;
         }
-        self::$rootDir = realpath(\dirname(__DIR__, 4) . DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        self::$rootDir = realpath(dirname(__DIR__, 4) . DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         try {
             $defaultFile = FileSystem::read(__DIR__ . DIRECTORY_SEPARATOR . 'dbgr.config.json');
             self::$config = Json::decode($defaultFile, Json::FORCE_ARRAY);
@@ -534,11 +540,11 @@ class Dbgr
     {
         self::loadDefaultConfig();
 
-        if ($count instanceof Countable || \is_array($count)) {
+        if ($count instanceof Countable || is_array($count)) {
             $count = count($count);
         }
 
-        if (!\is_int($count)) {
+        if (!is_int($count)) {
             throw new RuntimeException('Argument is not countable');
         }
 
@@ -588,7 +594,7 @@ class Dbgr
     private static function getParams(array $backtrace): array
     {
         $file = file($backtrace[0]['file']);
-        $line = trim((string) $file[$backtrace[0]['line'] - 1]);
+        $line = trim((string)$file[$backtrace[0]['line'] - 1]);
 
         $start = strpos($line, 'dump(') + 5;
 
@@ -606,15 +612,17 @@ class Dbgr
      */
     private static function getHash(array $args, array $backtrace, array $params): string
     {
-        return md5(base64_encode((string) json_encode([$args, $backtrace, $params])));
+        $array = json_encode([$args, array_column($backtrace, 'file'), array_column($backtrace, 'line'), $params]);
+
+        return md5($array);
     }
 
     /**
-     * @internal Call dump instead
-     *
      * @param mixed[] $args
      * @param mixed[] $backtrace
      * @param string[] $params
+     * @internal Call dump instead
+     *
      */
     public static function debugProccess(array $args, array $backtrace, array $params = null): void
     {
@@ -734,11 +742,13 @@ class Dbgr
 
         if ($first) {
             $nowMicro = microtime(true);
-            $now = DateTime::createFromFormat('U.u', (string) $nowMicro);
+
+            /** @noinspection PhpUnhandledExceptionInspection */
+            $now = DateTime::createFromFormat('U.u', (string)$nowMicro);
 
             if (self::$firstTimer) {
-                $difference = str_pad((string) round($nowMicro - self::$firstTimer, 3), 5, '0');
-                $lastDifference = str_pad((string) round($nowMicro - self::$lastTimer, 3), 5, '0');
+                $difference = str_pad((string)round($nowMicro - self::$firstTimer, 3), 5, '0');
+                $lastDifference = str_pad((string)round($nowMicro - self::$lastTimer, 3), 5, '0');
                 if ($now instanceof DateTime) {
                     $line .= "<span class='debug-hide' title='" . $now->format('Y-m-d H:i:s:u') . "'>" . $difference . ' (' . $lastDifference . ')</span>';
                 }
@@ -780,8 +790,8 @@ class Dbgr
      */
     private static function getOpenInIDEBacktrace(array $backtrace): string
     {
-        $link = self::getOpenInIDELink($backtrace['file'], (int) $backtrace['line']);
-        $line = "<a title='Otevřít v editoru' href='" . $link . "'><small>" . \dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
+        $link = self::getOpenInIDELink($backtrace['file'], (int)$backtrace['line']);
+        $line = "<a title='Otevřít v editoru' href='" . $link . "'><small>" . dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
 
         if (isset($backtrace['line'])) {
             $line .= ' (' . $backtrace['line'] . ')';
@@ -846,7 +856,7 @@ class Dbgr
             self::addToOutput("<div><strong class='debug-variable-name'>" . $params[$key] . ':</strong>');
             self::addToOutput("<div onclick='debugExpand(this, event);' class='debug-variable' title='Hold CTRL and double-click or triple-click to enlarge/shrink this dump'>");
 
-            if (\is_string($variable) && self::isSQL($variable)) {
+            if (is_string($variable) && self::isSQL($variable)) {
                 self::addToOutput("<div class='debug-sql'>");
                 self::addToOutput(self::highlight($variable));
                 self::addToOutput(self::sqlLink($variable));
@@ -888,14 +898,14 @@ class Dbgr
 
         // reduce spaces
         $sql = wordwrap($sql, 100);
-        $sql = (string) preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
-        $sql = (string) preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
+        $sql = (string)preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
+        $sql = (string)preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
         $sql = str_replace('            ', ' ', $sql);
 
         // syntax highlight
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
-        $sql = (string) preg_replace_callback($pattern, function ($matches) use ($break) {
+        $sql = (string)preg_replace_callback($pattern, function ($matches) use ($break) {
             if (!empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
@@ -918,7 +928,7 @@ class Dbgr
 
             return '';
         }, $sql);
-        $sql = trim((string) preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
+        $sql = trim((string)preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
 
         return "<span class='dump'>${sql}</span>";
     }
@@ -930,7 +940,7 @@ class Dbgr
             $query = [
                 'username' => self::$adminerUsername,
                 'db' => self::$adminerDatabaseName,
-                'sql' => trim((string) preg_replace('/[ \t]+/', ' ', $sql)),
+                'sql' => trim((string)preg_replace('/[ \t]+/', ' ', $sql)),
             ];
             $return = '<a class="debug-sql-link" target="_blank" href="' . self::$adminerUrlLink . '?' . http_build_query($query) . '">Open using adminer</a>';
         }
@@ -946,7 +956,7 @@ class Dbgr
     private static function useDumper($variable)
     {
         $options = self::$dumperOptions;
-        if (\is_string($variable)) {
+        if (is_string($variable)) {
             $options[Dumper::TRUNCATE] = false;
         }
 
@@ -967,7 +977,7 @@ class Dbgr
             (getenv('ConEmuANSI') === 'ON'
                 || getenv('ANSICON') !== false
                 || getenv('term') === 'xterm-256color'
-                || (\defined('STDOUT') && \function_exists('posix_isatty') && posix_isatty(STDOUT)));
+                || (defined('STDOUT') && function_exists('posix_isatty') && posix_isatty(STDOUT)));
     }
 
     /**
@@ -990,9 +1000,9 @@ class Dbgr
      */
     private static function isBacktrace($variable): bool
     {
-        return \is_array($variable) &&
+        return is_array($variable) &&
             isset($variable[0]) &&
-            \is_array($variable[0]) &&
+            is_array($variable[0]) &&
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
     }
 
@@ -1058,8 +1068,8 @@ class Dbgr
      */
     private static function ajaxOutput()
     {
-        if (\is_string(self::$output)) {
-            $pregReplace = (string) preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
+        if (is_string(self::$output)) {
+            $pregReplace = (string)preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
 
             return str_replace('x//', '', $pregReplace);
         }
@@ -1106,8 +1116,8 @@ class Dbgr
             $count = count(self::$config['didYouKnow']);
             try {
                 $index = random_int(0, $count - 1);
-            } catch (\Throwable $e) {
-                $index = substr((string) time(), -1, 1); //Eh, random enough, shouldn't happen anyway
+            } catch (Throwable $e) {
+                $index = substr((string)time(), -1, 1); //Eh, random enough, shouldn't happen anyway
             }
             self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b></div>');
         }
