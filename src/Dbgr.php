@@ -266,9 +266,9 @@ class Dbgr
 
         if ($reset || empty(self::$dumperOptions)) {
             self::$dumperOptions = [
-                Dumper::DEPTH => false,
+                Dumper::DEPTH => 4,
                 Dumper::TRUNCATE => 1024,
-                Dumper::COLLAPSE => false,
+                Dumper::COLLAPSE => 14,
                 Dumper::COLLAPSE_COUNT => 7,
                 Dumper::DEBUGINFO => true,
                 Dumper::LOCATION => Dumper::LOCATION_CLASS,
