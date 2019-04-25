@@ -957,7 +957,7 @@ class Dbgr
     {
         $options = self::$dumperOptions;
         if (is_string($variable)) {
-            $options[Dumper::TRUNCATE] = false;
+            $options[Dumper::TRUNCATE] = null;
         }
 
         if (self::$forceHTML === true || (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list())))) {
