@@ -1050,13 +1050,13 @@ class Dbgr
         $styles = '';
         $path = __DIR__ . DIRECTORY_SEPARATOR;
         $styles .= '<style>';
-        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.css');
-        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.css');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/Toggle/toggle.css');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/Dumper/assets/dumper.css');
         $styles .= FileSystem::read($path . 'dumper.css');
         $styles .= '</style>';
         $styles .= '<script>';
-        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Toggle/toggle.js');
-        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/assets/Dumper/dumper.js');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/Toggle/toggle.js');
+        $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/Dumper/assets/dumper.js');
         $styles .= FileSystem::read($path . 'dumper.js');
         $styles .= '</script>';
 
