@@ -5,26 +5,27 @@ declare(strict_types=1);
 namespace noximo;
 
 use Countable;
-use Nette\FileNotFoundException;
-use Nette\Utils\DateTime;
-use Nette\Utils\FileSystem;
-use Nette\Utils\Json;
-use RuntimeException;
-use Throwable;
-use Tracy\Debugger;
-use Tracy\Dumper;
-use Tracy\Helpers;
 use function defined;
 use function dirname;
 use function function_exists;
 use function is_array;
 use function is_int;
 use function is_string;
+use Nette\FileNotFoundException;
+use Nette\Utils\DateTime;
+use Nette\Utils\FileSystem;
+use Nette\Utils\Json;
+use Nette\Utils\JsonException;
+use RuntimeException;
+use Throwable;
+use Tracy\Debugger;
+use Tracy\Dumper;
+use Tracy\Helpers;
 
 /**
  * Class Dbgr
  */
-class Dbgr
+final class Dbgr
 {
     /**
      * @var Dbgr
@@ -149,6 +150,11 @@ class Dbgr
         self::loadDefaultConfig();
     }
 
+    public function __toString(): string
+    {
+        return '';
+    }
+
     public static function loadDefaultConfig(): void
     {
         if (self::$initialized) {
@@ -180,15 +186,32 @@ class Dbgr
     /**
      * Instantly prints out message
      *
-     * @param mixed[] $customConfig
+     * @param bool $bold Should message be bolder?
      *
      * @return Dbgr
      */
-    public static function setConfig(array $customConfig): self
+    public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
     {
         self::loadDefaultConfig();
 
-        self::setConfigData($customConfig);
+        if ($bold) {
+            $message = '<b>' . $message . '</b>';
+        }
+        if ($showTime) {
+            $message = date('Y-m-d H:i:s') . ' - ' . $message;
+        }
+        if (PHP_SAPI !== 'cli') {
+            echo $message;
+        } elseif ($stripTags) {
+            echo strip_tags($message);
+        } else {
+            echo $message;
+        }
+        echo PHP_EOL;
+        /** @noinspection PhpUsageOfSilenceOperatorInspection */
+        @flush();
+        /** @noinspection PhpUsageOfSilenceOperatorInspection */
+        @ob_flush();
 
         return self::getInstance();
     }
@@ -203,6 +226,35 @@ class Dbgr
         }
 
         return self::$instance;
+    }
+
+    public static function setProperLogDir(string $logDir): void
+    {
+        $logDir = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $logDir);
+        if (FileSystem::isAbsolute($logDir)) {
+            $path = $logDir;
+        } else {
+            $path = self::$rootDir . trim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        }
+
+        self::$logDir = $path;
+        FileSystem::createDir(self::$logDir);
+    }
+
+    /**
+     * Instantly prints out message
+     *
+     * @param mixed[] $customConfig
+     *
+     * @return Dbgr
+     */
+    public static function setConfig(array $customConfig): self
+    {
+        self::loadDefaultConfig();
+
+        self::setConfigData($customConfig);
+
+        return self::getInstance();
     }
 
     /**
@@ -290,8 +342,7 @@ class Dbgr
 
         if ($filename === null) {
             $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-            $params = self::getParams($backtrace);
-            $filename = self::getHash([], $backtrace, $params);
+            $filename = self::getHash($backtrace);
         }
         $filename = str_replace('.html', '', $filename) . '.html';
         self::$file = $filename;
@@ -350,36 +401,29 @@ class Dbgr
     }
 
     /**
-     * Instantly prints out message
-     *
-     * @param bool $bold Should message be bolder?
-     *
-     * @return Dbgr
+     * @param mixed[] $args
+     * @param mixed[] $backtrace
+     * @param string[] $params
+     * @internal Call dump instead
      */
-    public static function echo(string $message, bool $bold = true, bool $showTime = false, bool $stripTags = false): self
+    public static function debugProccess(array $args, array $backtrace, ?array $params = null): void
     {
-        self::loadDefaultConfig();
+        self::clearOutput();
+        if ($params === null) {
+            $params = self::getParams($backtrace);
+        }
+        self::debugStart(self::getHash($backtrace));
 
-        if ($bold) {
-            $message = '<b>' . $message . '</b>';
+        self::firstBacktrace($backtrace);
+        if ((! self::$isAjax && ! self::$isConsole) || self::$forceHTML === true) {
+            self::restOftheBacktraces($backtrace);
         }
-        if ($showTime) {
-            $message = date('Y-m-d H:i:s') . ' - ' . $message;
-        }
-        if (PHP_SAPI !== 'cli') {
-            echo $message;
-        } elseif ($stripTags) {
-            echo strip_tags($message);
-        } else {
-            echo $message;
-        }
-        echo PHP_EOL;
-        /** @noinspection PhpUsageOfSilenceOperatorInspection */
-        @flush();
-        /** @noinspection PhpUsageOfSilenceOperatorInspection */
-        @ob_flush();
 
-        return self::getInstance();
+        self::printVariables($args, $params);
+
+        self::printDidYouKnow();
+        self::debugEnd();
+        self::printOutput();
     }
 
     /**
@@ -448,19 +492,6 @@ class Dbgr
         self::setProperLogDir($logDir);
 
         return self::getInstance();
-    }
-
-    public static function setProperLogDir(string $logDir)
-    {
-        $logDir = str_replace(["/", "\\"], DIRECTORY_SEPARATOR, $logDir);
-        if (FileSystem::isAbsolute($logDir)) {
-            $path = $logDir;
-        } else {
-            $path = self::$rootDir . trim($logDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-        }
-
-        self::$logDir = $path;
-        FileSystem::createDir(self::$logDir);
     }
 
     /**
@@ -544,7 +575,7 @@ class Dbgr
             $count = count($count);
         }
 
-        if (!is_int($count)) {
+        if (! is_int($count)) {
             throw new RuntimeException('Argument is not countable');
         }
 
@@ -587,6 +618,48 @@ class Dbgr
     }
 
     /**
+     * @param mixed[] $customConfig
+     */
+    private static function setConfigData(array $customConfig): void
+    {
+        self::$config = (array) array_replace_recursive(self::$config, $customConfig);
+
+        self::setProperLogDir(self::$config['logDir']);
+        self::$allowedIPAddresses = self::$config['allowedIPAddresses'] ?? null;
+        self::$adminerUrlLink = self::$config['adminerUrlLink'] ?? null;
+        self::$adminerDatabaseName = self::$config['adminerDatabaseName'] ?? null;
+        self::$adminerUsername = self::$config['adminerUsername'] ?? null;
+
+        if (isset(self::$config['editorUri']) &&
+            self::$config['editorUri'] !== null &&
+            self::$config['editorUri'] !== '' &&
+            self::$config['editorUri'] !== Debugger::$editor) {
+            /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
+            Debugger::$editor = self::$config['editorUri'];
+        }
+    }
+
+    /**
+     * @param mixed[] $backtrace
+     * @return string
+     */
+    private static function getHash(array $backtrace): string
+    {
+        try {
+            $array = Json::encode([array_column($backtrace, 'file'), array_column($backtrace, 'line')]);
+
+            return md5($array);
+        } catch (JsonException $e) {
+            return md5('');
+        }
+    }
+
+    private static function clearOutput(): void
+    {
+        self::$output = '';
+    }
+
+    /**
      * @param mixed[] $backtrace
      *
      * @return string[]
@@ -594,7 +667,7 @@ class Dbgr
     private static function getParams(array $backtrace): array
     {
         $file = file($backtrace[0]['file']);
-        $line = trim((string)$file[$backtrace[0]['line'] - 1]);
+        $line = trim((string) $file[$backtrace[0]['line'] - 1]);
 
         $start = strpos($line, 'dump(') + 5;
 
@@ -605,54 +678,10 @@ class Dbgr
         return explode(',', $params);
     }
 
-    /**
-     * @param string[] $args
-     * @param mixed[] $backtrace
-     * @param string[] $params
-     */
-    private static function getHash(array $args, array $backtrace, array $params): string
-    {
-        $array = json_encode([$args, array_column($backtrace, 'file'), array_column($backtrace, 'line'), $params]);
-
-        return md5($array);
-    }
-
-    /**
-     * @param mixed[] $args
-     * @param mixed[] $backtrace
-     * @param string[] $params
-     * @internal Call dump instead
-     *
-     */
-    public static function debugProccess(array $args, array $backtrace, array $params = null): void
-    {
-        self::clearOutput();
-        if ($params === null) {
-            $params = self::getParams($backtrace);
-        }
-        self::debugStart(self::getHash($args, $backtrace, $params));
-
-        self::firstBacktrace($backtrace);
-        if ((!self::$isAjax && !self::$isConsole) || self::$forceHTML === true) {
-            self::restOftheBacktraces($backtrace);
-        }
-
-        self::printVariables($args, $params);
-
-        self::printDidYouKnow();
-        self::debugEnd();
-        self::printOutput();
-    }
-
-    private static function clearOutput(): void
-    {
-        self::$output = '';
-    }
-
     private static function debugStart(string $hash): void
     {
         if (self::$forceHTML === false &&
-            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            ! empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             self::$isAjax = true;
         }
@@ -662,7 +691,7 @@ class Dbgr
         }
 
         $color = self::$even ? 'lightyellow' : 'rgb(255, 255, 187)';
-        self::$even = !self::$even;
+        self::$even = ! self::$even;
 
         $borderColor = self::colorize();
 
@@ -708,12 +737,7 @@ class Dbgr
         self::addToOutput('</div>');
     }
 
-    /**
-     * @param mixed[] $backtrace
-     *
-     * @return mixed
-     */
-    private static function getFirstBacktrace(array $backtrace)
+    private static function getFirstBacktrace(array $backtrace): array
     {
         $first = $backtrace[0];
         if (isset($backtrace[1]['class'])) {
@@ -732,7 +756,7 @@ class Dbgr
     }
 
     /**
-     * @param mixed[] $backtrace
+     * @param array $backtrace
      * @param bool|null $first
      */
     private static function printHeader(array $backtrace, ?bool $first = null): void
@@ -744,11 +768,11 @@ class Dbgr
             $nowMicro = microtime(true);
 
             /** @noinspection PhpUnhandledExceptionInspection */
-            $now = DateTime::createFromFormat('U.u', (string)$nowMicro);
+            $now = DateTime::createFromFormat('U.u', (string) $nowMicro);
 
             if (self::$firstTimer) {
-                $difference = str_pad((string)round($nowMicro - self::$firstTimer, 3), 5, '0');
-                $lastDifference = str_pad((string)round($nowMicro - self::$lastTimer, 3), 5, '0');
+                $difference = str_pad((string) round($nowMicro - self::$firstTimer, 3), 5, '0');
+                $lastDifference = str_pad((string) round($nowMicro - self::$lastTimer, 3), 5, '0');
                 if ($now instanceof DateTime) {
                     $line .= "<span class='debug-hide' title='" . $now->format('Y-m-d H:i:s:u') . "'>" . $difference . ' (' . $lastDifference . ')</span>';
                 }
@@ -790,7 +814,7 @@ class Dbgr
      */
     private static function getOpenInIDEBacktrace(array $backtrace): string
     {
-        $link = self::getOpenInIDELink($backtrace['file'], (int)$backtrace['line']);
+        $link = self::getOpenInIDELink($backtrace['file'], (int) $backtrace['line']);
         $line = "<a title='Otevřít v editoru' href='" . $link . "'><small>" . dirname($backtrace['file']) . DIRECTORY_SEPARATOR . '</small><strong>' . basename($backtrace['file']);
 
         if (isset($backtrace['line'])) {
@@ -824,16 +848,16 @@ class Dbgr
             self::addToOutput('</div>');
         }
 
-        if (!empty($_GET)) {
+        if (! empty($_GET)) {
             self::printVariables([$_GET], ['GET']);
         }
-        if (!empty($_POST)) {
+        if (! empty($_POST)) {
             self::printVariables([$_POST], ['POST']);
         }
-        if (!empty($_SERVER)) {
+        if (! empty($_SERVER)) {
             self::printVariables([$_SERVER], ['SERVER']);
         }
-        if (!empty($_SESSION)) {
+        if (! empty($_SESSION)) {
             self::printVariables([$_SESSION], ['SESSION']);
         }
 
@@ -850,7 +874,7 @@ class Dbgr
     private static function printVariables(array $variables, array $params): void
     {
         foreach ($variables as $key => $variable) {
-            if ((self::$isAjax || self::$isConsole) && !self::$file) {
+            if ((self::$isAjax || self::$isConsole) && ! self::$file) {
                 self::addToOutput('---');
             }
             self::addToOutput("<div><strong class='debug-variable-name'>" . $params[$key] . ':</strong>');
@@ -862,7 +886,6 @@ class Dbgr
                 self::addToOutput(self::sqlLink($variable));
                 self::addToOutput('</div>');
             } elseif ($variable instanceof Throwable) {
-                /** @var Throwable $variable */
                 self::addToOutput(self::useDumper($variable), null);
                 self::printBacktraces($variable->getTrace());
             } elseif (self::isBacktrace($variable)) {
@@ -881,7 +904,7 @@ class Dbgr
 
         $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         preg_match($patter, strtoupper($sql), $matches);
-        if (!empty($matches)) {
+        if (! empty($matches)) {
             return true;
         }
 
@@ -898,37 +921,37 @@ class Dbgr
 
         // reduce spaces
         $sql = wordwrap($sql, 100);
-        $sql = (string)preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
-        $sql = (string)preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
+        $sql = (string) preg_replace("#([ \t]*\r?\n){2,}#", "\n", $sql);
+        $sql = (string) preg_replace('#VARCHAR\\(#', 'VARCHAR (', $sql);
         $sql = str_replace('            ', ' ', $sql);
 
         // syntax highlight
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
-        $sql = (string)preg_replace_callback($pattern, function ($matches) use ($break) {
-            if (!empty($matches[1])) {
+        $sql = (string) preg_replace_callback($pattern, static function ($matches) use ($break) {
+            if (! empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
             }
 
-            if (!empty($matches[2])) {
+            if (! empty($matches[2])) {
                 // error
                 return '<strong style="color:red">' . $matches[2] . '</strong>';
             }
 
-            if (!empty($matches[3])) {
+            if (! empty($matches[3])) {
                 // most important keywords
                 return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
             }
 
-            if (!empty($matches[4])) {
+            if (! empty($matches[4])) {
                 // other keywords
                 return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
             }
 
             return '';
         }, $sql);
-        $sql = trim((string)preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
+        $sql = trim((string) preg_replace('#' . preg_quote($break, '/') . '#', '', $sql, 1));
 
         return "<span class='dump'>${sql}</span>";
     }
@@ -940,7 +963,7 @@ class Dbgr
             $query = [
                 'username' => self::$adminerUsername,
                 'db' => self::$adminerDatabaseName,
-                'sql' => trim((string)preg_replace('/[ \t]+/', ' ', $sql)),
+                'sql' => trim((string) preg_replace('/[ \t]+/', ' ', $sql)),
             ];
             $return = '<a class="debug-sql-link" target="_blank" href="' . self::$adminerUrlLink . '?' . http_build_query($query) . '">Open using adminer</a>';
         }
@@ -950,17 +973,15 @@ class Dbgr
 
     /**
      * @param mixed $variable
-     *
-     * @return mixed
      */
-    private static function useDumper($variable)
+    private static function useDumper($variable): string
     {
         $options = self::$dumperOptions;
         if (is_string($variable)) {
             $options[Dumper::TRUNCATE] = null;
         }
 
-        if (self::$forceHTML === true || (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list())))) {
+        if (self::$forceHTML === true || (PHP_SAPI !== 'cli' && ! preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list())))) {
             $string = Dumper::toHtml($variable, $options);
         } elseif (self::detectColors()) {
             $string = Dumper::toTerminal($variable, $options);
@@ -997,6 +1018,7 @@ class Dbgr
 
     /**
      * @param mixed $variable
+     * @return bool
      */
     private static function isBacktrace($variable): bool
     {
@@ -1004,6 +1026,19 @@ class Dbgr
             isset($variable[0]) &&
             is_array($variable[0]) &&
             (isset($variable[0]['function']) || isset($variable[0]['file'], $variable[0]['line']));
+    }
+
+    private static function printDidYouKnow(): void
+    {
+        if (! self::$stylesPrinted) {
+            $count = count(self::$config['didYouKnow']);
+            try {
+                $index = random_int(0, $count - 1);
+            } catch (Throwable $e) {
+                $index = substr((string) time(), -1, 1); //Eh, random enough, shouldn't happen anyway
+            }
+            self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b></div>');
+        }
     }
 
     private static function debugEnd(): void
@@ -1016,8 +1051,8 @@ class Dbgr
     {
         self::$allOutputs[] = self::$output;
 
-        if (!self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
-            if (!self::$stylesPrinted && (!self::$isAjax || self::$forceHTML === true)) {
+        if (! self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
+            if (! self::$stylesPrinted && (! self::$isAjax || self::$forceHTML === true)) {
                 self::printStyles();
             }
             if (self::$isAjax) {
@@ -1025,8 +1060,8 @@ class Dbgr
             } else {
                 self::echo(self::$output, false);
             }
-        } elseif (!empty(self::$file) && !empty(self::$logDir)) {
-            if (!isset(self::$fileOutputs[self::$file])) {
+        } elseif (! empty(self::$file) && ! empty(self::$logDir)) {
+            if (! isset(self::$fileOutputs[self::$file])) {
                 self::$fileOutputs[self::$file] = '';
             }
             self::$fileOutputs[self::$file] .= self::$output;
@@ -1064,12 +1099,12 @@ class Dbgr
     }
 
     /**
-     * @return mixed
+     * @return string
      */
-    private static function ajaxOutput()
+    private static function ajaxOutput(): string
     {
         if (is_string(self::$output)) {
-            $pregReplace = (string)preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
+            $pregReplace = (string) preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", strip_tags(self::$output));
 
             return str_replace('x//', '', $pregReplace);
         }
@@ -1086,46 +1121,6 @@ class Dbgr
         $html .= '</body></html>';
 
         return $html;
-    }
-
-    /**
-     * @param mixed[] $customConfig
-     */
-    private static function setConfigData(array $customConfig): void
-    {
-        self::$config = array_replace_recursive(self::$config, $customConfig);
-
-        self::setProperLogDir(self::$config['logDir']);
-        self::$allowedIPAddresses = self::$config['allowedIPAddresses'] ?? null;
-        self::$adminerUrlLink = self::$config['adminerUrlLink'] ?? null;
-        self::$adminerDatabaseName = self::$config['adminerDatabaseName'] ?? null;
-        self::$adminerUsername = self::$config['adminerUsername'] ?? null;
-
-        if (isset(self::$config['editorUri']) &&
-            self::$config['editorUri'] !== null &&
-            self::$config['editorUri'] !== '' &&
-            self::$config['editorUri'] !== Debugger::$editor) {
-            /** @noinspection DisallowWritingIntoStaticPropertiesInspection */
-            Debugger::$editor = self::$config['editorUri'];
-        }
-    }
-
-    private static function printDidYouKnow(): void
-    {
-        if (!self::$stylesPrinted) {
-            $count = count(self::$config['didYouKnow']);
-            try {
-                $index = random_int(0, $count - 1);
-            } catch (Throwable $e) {
-                $index = substr((string)time(), -1, 1); //Eh, random enough, shouldn't happen anyway
-            }
-            self::addToOutput("<div class='debug-didYouKnow'><b>Did you know?</b> " . self::$config['didYouKnow'][$index] . '</b></div>');
-        }
-    }
-
-    public function __toString()
-    {
-        return '';
     }
 }
 
