@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace noximo;
 
 use Countable;
-use function defined;
-use function dirname;
-use function function_exists;
-use function is_array;
-use function is_int;
-use function is_string;
-use Nette\FileNotFoundException;
-use Nette\Utils\DateTime;
-use Nette\Utils\FileSystem;
-use Nette\Utils\Json;
-use Nette\Utils\JsonException;
-use RuntimeException;
 use Throwable;
-use Tracy\Debugger;
 use Tracy\Dumper;
 use Tracy\Helpers;
+use Tracy\Debugger;
+use Nette\Utils\Json;
+use RuntimeException;
+use Nette\Utils\DateTime;
+use Nette\Utils\FileSystem;
+use Nette\Utils\JsonException;
+use Nette\FileNotFoundException;
+use function is_int;
+use function defined;
+use function dirname;
+use function is_array;
+use function is_string;
+use function function_exists;
 
 /**
  * Class Dbgr
@@ -383,9 +383,7 @@ final class Dbgr
     {
         self::loadDefaultConfig();
 
-        $addresses = array_merge(self::$localIPAddresses, self::$allowedIPAddresses);
-
-        return self::$forceDevelopmentMode || Debugger::detectDebugMode($addresses);
+        return self::$forceDevelopmentMode || Debugger::isEnabled() || Debugger::detectDebugMode(array_merge(self::$localIPAddresses, self::$allowedIPAddresses));
     }
 
     /**
@@ -415,7 +413,7 @@ final class Dbgr
         self::debugStart(self::getHash($backtrace));
 
         self::firstBacktrace($backtrace);
-        if ((! self::$isAjax && ! self::$isConsole) || self::$forceHTML === true) {
+        if ((!self::$isAjax && !self::$isConsole) || self::$forceHTML === true) {
             self::restOftheBacktraces($backtrace);
         }
 
@@ -575,7 +573,7 @@ final class Dbgr
             $count = count($count);
         }
 
-        if (! is_int($count)) {
+        if (!is_int($count)) {
             throw new RuntimeException('Argument is not countable');
         }
 
@@ -681,7 +679,7 @@ final class Dbgr
     private static function debugStart(string $hash): void
     {
         if (self::$forceHTML === false &&
-            ! empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             self::$isAjax = true;
         }
@@ -691,7 +689,7 @@ final class Dbgr
         }
 
         $color = self::$even ? 'lightyellow' : 'rgb(255, 255, 187)';
-        self::$even = ! self::$even;
+        self::$even = !self::$even;
 
         $borderColor = self::colorize();
 
@@ -848,16 +846,16 @@ final class Dbgr
             self::addToOutput('</div>');
         }
 
-        if (! empty($_GET)) {
+        if (!empty($_GET)) {
             self::printVariables([$_GET], ['GET']);
         }
-        if (! empty($_POST)) {
+        if (!empty($_POST)) {
             self::printVariables([$_POST], ['POST']);
         }
-        if (! empty($_SERVER)) {
+        if (!empty($_SERVER)) {
             self::printVariables([$_SERVER], ['SERVER']);
         }
-        if (! empty($_SESSION)) {
+        if (!empty($_SESSION)) {
             self::printVariables([$_SESSION], ['SESSION']);
         }
 
@@ -874,7 +872,7 @@ final class Dbgr
     private static function printVariables(array $variables, array $params): void
     {
         foreach ($variables as $key => $variable) {
-            if ((self::$isAjax || self::$isConsole) && ! self::$file) {
+            if ((self::$isAjax || self::$isConsole) && !self::$file) {
                 self::addToOutput('---');
             }
             self::addToOutput("<div><strong class='debug-variable-name'>" . $params[$key] . ':</strong>');
@@ -904,7 +902,7 @@ final class Dbgr
 
         $patter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         preg_match($patter, strtoupper($sql), $matches);
-        if (! empty($matches)) {
+        if (!empty($matches)) {
             return true;
         }
 
@@ -929,22 +927,22 @@ final class Dbgr
         /** @noinspection CallableParameterUseCaseInTypeContextInspection */
         $pattern = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])(${keywords1})(?=[\\s,)])|(?<=[\\s,(=])(${keywords2})(?=[\\s,)=])#si";
         $sql = (string) preg_replace_callback($pattern, static function ($matches) use ($break) {
-            if (! empty($matches[1])) {
+            if (!empty($matches[1])) {
                 // comment
                 return '<em style="color:gray">' . $matches[1] . '</em>';
             }
 
-            if (! empty($matches[2])) {
+            if (!empty($matches[2])) {
                 // error
                 return '<strong style="color:red">' . $matches[2] . '</strong>';
             }
 
-            if (! empty($matches[3])) {
+            if (!empty($matches[3])) {
                 // most important keywords
                 return $break . '<strong style="color:blue">' . strtoupper($matches[3]) . '</strong>';
             }
 
-            if (! empty($matches[4])) {
+            if (!empty($matches[4])) {
                 // other keywords
                 return '<strong style="color:green">' . strtoupper($matches[4]) . '</strong>';
             }
@@ -981,7 +979,7 @@ final class Dbgr
             $options[Dumper::TRUNCATE] = null;
         }
 
-        if (self::$forceHTML === true || (PHP_SAPI !== 'cli' && ! preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list())))) {
+        if (self::$forceHTML === true || (PHP_SAPI !== 'cli' && !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list())))) {
             $string = Dumper::toHtml($variable, $options);
         } elseif (self::detectColors()) {
             $string = Dumper::toTerminal($variable, $options);
@@ -1030,7 +1028,7 @@ final class Dbgr
 
     private static function printDidYouKnow(): void
     {
-        if (! self::$stylesPrinted) {
+        if (!self::$stylesPrinted) {
             $count = count(self::$config['didYouKnow']);
             try {
                 $index = random_int(0, $count - 1);
@@ -1051,8 +1049,8 @@ final class Dbgr
     {
         self::$allOutputs[] = self::$output;
 
-        if (! self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
-            if (! self::$stylesPrinted && (! self::$isAjax || self::$forceHTML === true)) {
+        if (!self::$isConsole && empty(self::$file) && self::canBeOutputed()) {
+            if (!self::$stylesPrinted && (!self::$isAjax || self::$forceHTML === true)) {
                 self::printStyles();
             }
             if (self::$isAjax) {
@@ -1060,8 +1058,8 @@ final class Dbgr
             } else {
                 self::echo(self::$output, false);
             }
-        } elseif (! empty(self::$file) && ! empty(self::$logDir)) {
-            if (! isset(self::$fileOutputs[self::$file])) {
+        } elseif (!empty(self::$file) && !empty(self::$logDir)) {
+            if (!isset(self::$fileOutputs[self::$file])) {
                 self::$fileOutputs[self::$file] = '';
             }
             self::$fileOutputs[self::$file] .= self::$output;
