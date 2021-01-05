@@ -1113,7 +1113,11 @@ final class Dbgr
         $styles .= '</style>';
         $styles .= '<script>';
         $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/Toggle/toggle.js');
+        $styles .= '</script>';
+        $styles .= '<script>';
         $styles .= FileSystem::read(self::$rootDir . 'vendor/tracy/tracy/src/Tracy/Dumper/assets/dumper.js');
+        $styles .= '</script>';
+        $styles .= '<script>';
         $styles .= FileSystem::read($path . 'dumper.js');
         $styles .= '</script>';
 

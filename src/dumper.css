@@ -100,9 +100,5 @@
 
 /* dump */
 pre.tracy-dump {
-    text-align: left;
-    color: #444;
-    font-size: 12px !important;
-    margin: 0;
-    padding: 3px;
+    font-size: 14px !important;
 }
