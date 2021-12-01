@@ -1142,7 +1142,7 @@ final class Dbgr
     {
         $html = '';
         $html .= '<html lang=""><body>';
-        $html .= str_replace(PHP_EOL, ' ', self::getStyles()) . PHP_EOL;
+        $html .= self::getStyles() . PHP_EOL;
         $html .= $lines;
         $html .= '</body></html>';
 
