@@ -20,7 +20,7 @@
   },
   "require": {
     "php": ">= 7.2",
-    "tracy/tracy": "^2.8",
+    "tracy/tracy": ">=2.9",
     "ext-json": "*",
     "nette/utils": "^3.0"
   },
